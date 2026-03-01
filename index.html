@@ -3,57 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Fuvarozó Regisztráció</title>
+    <title>NextLoad - Regisztráció</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0052FF; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { background: white; color: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; text-align: center; }
-        h1 { color: #0052FF; margin-bottom: 20px; }
-        input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background-color: #00F5A0; border: none; border-radius: 8px; color: #0052FF; font-weight: bold; cursor: pointer; font-size: 1rem; }
-        button:hover { background-color: #00d48a; }
-        #message { margin-top: 15px; font-size: 0.9rem; font-weight: bold; }
+        body { font-family: sans-serif; background-color: #0052FF; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .box { background: white; color: #333; padding: 30px; border-radius: 15px; width: 300px; text-align: center; }
+        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { width: 100%; padding: 12px; background: #00F5A0; border: none; border-radius: 5px; color: #0052FF; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>NextLoad</h1>
-        <p>Fuvarozói regisztráció</p>
-        <input type="text" id="fullName" placeholder="Teljes neved">
-        <select id="vehicle">
+    <div class="box">
+        <h2 style="color:#0052FF">NextLoad</h2>
+        <input type="text" id="neved" placeholder="Teljes neved">
+        <select id="auto">
             <option value="furgon">Furgon</option>
-            <option value="teherauto">Teherautó (3.5t+)</option>
-            <option value="puttonyos">Puttonyos autó</option>
+            <option value="kamion">Kamion</option>
         </select>
-        <button onclick="signUp()">Csatlakozás fuvarozóként</button>
-        <div id="message"></div>
+        <button onclick="elkuld()">Csatlakozás</button>
+        <p id="visszajelzes" style="font-weight:bold; margin-top:10px;"></p>
     </div>
 
     <script>
-        // IDE KELL MAJD MÁSOLNOD A KULCSOKAT A KÖVETKEZŐ LÉPÉSBEN
-        const SUPABASE_URL = 'https://sqnwvposgbnhsfzdajib.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I';
-        
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // FIGYELJ: Itt más neveket használok, hogy NE legyen ütközés!
+        const SAJAT_URL = 'https://sqnwvposgbnhsfzdajib.supabase.co';
+        const SAJAT_KULCS = 'IDE_MASOLD_AZ_ANON_KULCSOT'; // <--- IDE AZ ANON PUBLIC KULCS KELL!
 
-        async function signUp() {
-            const name = document.getElementById('fullName').value;
-            const vehicle = document.getElementById('vehicle').value;
-            const msg = document.getElementById('message');
+        const kapcsolat = supabase.createClient(SAJAT_URL, SAJAT_KULCS);
 
-            if(!name) { msg.innerText = "Kérlek add meg a neved!"; return; }
+        async function elkuld() {
+            const nev = document.getElementById('neved').value;
+            const jarmu = document.getElementById('auto').value;
+            const statusz = document.getElementById('visszajelzes');
 
-            const { data, error } = await supabase
+            if(!nev) { statusz.innerText = "Írd be a neved!"; return; }
+
+            const { error } = await kapcsolat
                 .from('carriers')
-                .insert([{ full_name: name, vehicle_type: vehicle }]);
+                .insert([{ full_name: nev, vehicle_type: jarmu }]);
 
             if (error) {
-                msg.innerText = "Hiba történt: " + error.message;
-                msg.style.color = "red";
+                statusz.innerText = "Hiba: " + error.message;
+                statusz.style.color = "red";
             } else {
-                msg.innerText = "Sikeres regisztráció! Üdv a NextLoadnál!";
-                msg.style.color = "green";
-                document.getElementById('fullName').value = "";
+                statusz.innerText = "SIKER! Benne vagy a rendszerben!";
+                statusz.style.color = "green";
+                document.getElementById('neved').value = "";
             }
         }
     </script>
