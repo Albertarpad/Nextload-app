@@ -2,18 +2,60 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>NextLoad - Hamarosan...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NextLoad - Fuvarozó Regisztráció</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; background-color: #0052FF; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { text-align: center; border: 2px solid #00F5A0; padding: 40px; border-radius: 20px; }
-        h1 { font-size: 3rem; margin-bottom: 10px; }
-        p { font-size: 1.2rem; opacity: 0.9; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0052FF; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { background: white; color: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; text-align: center; }
+        h1 { color: #0052FF; margin-bottom: 20px; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: #00F5A0; border: none; border-radius: 8px; color: #0052FF; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        button:hover { background-color: #00d48a; }
+        #message { margin-top: 15px; font-size: 0.9rem; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="card">
+    <div class="container">
         <h1>NextLoad</h1>
-        <p>Az AI alapú fuvarozási forradalom elindult.</p>
+        <p>Fuvarozói regisztráció</p>
+        <input type="text" id="fullName" placeholder="Teljes neved">
+        <select id="vehicle">
+            <option value="furgon">Furgon</option>
+            <option value="teherauto">Teherautó (3.5t+)</option>
+            <option value="puttonyos">Puttonyos autó</option>
+        </select>
+        <button onclick="signUp()">Csatlakozás fuvarozóként</button>
+        <div id="message"></div>
     </div>
+
+    <script>
+        // IDE KELL MAJD MÁSOLNOD A KULCSOKAT A KÖVETKEZŐ LÉPÉSBEN
+        const SUPABASE_URL = 'https://supabase.com/dashboard/project/sqnwvposgbnhsfzdajib/settings/api-keys';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function signUp() {
+            const name = document.getElementById('fullName').value;
+            const vehicle = document.getElementById('vehicle').value;
+            const msg = document.getElementById('message');
+
+            if(!name) { msg.innerText = "Kérlek add meg a neved!"; return; }
+
+            const { data, error } = await supabase
+                .from('carriers')
+                .insert([{ full_name: name, vehicle_type: vehicle }]);
+
+            if (error) {
+                msg.innerText = "Hiba történt: " + error.message;
+                msg.style.color = "red";
+            } else {
+                msg.innerText = "Sikeres regisztráció! Üdv a NextLoadnál!";
+                msg.style.color = "green";
+                document.getElementById('fullName').value = "";
+            }
+        }
+    </script>
 </body>
 </html>
