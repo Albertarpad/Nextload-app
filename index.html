@@ -56,7 +56,7 @@
             if (c.last_location_lat && c.last_location_lng) {
                 let ikon = c.vehicle_type === 'kamion' ? '🚛' : c.vehicle_type === 'furgon' ? '🚚' : '🚗';
                 L.marker([c.last_location_lat, c.last_location_lng]).addTo(map)
-                .bindPopup(`<div style="text-align:center;"><div style="font-size:1.5rem;">${ikon}</div><b>${c.full_name}</b><br>${c.vehicle_type}</div>`);
+               .bindTooltip(`${c.full_name}`, { permanent: true, direction: 'top' });
             }
         });
     }
