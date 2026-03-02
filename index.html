@@ -9,12 +9,78 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <style>
-        body { font-family: sans-serif; margin: 0; background: #f0f2f5; }
-        .header { background: #0052FF; color: white; padding: 15px; text-align: center; }
-        #map { height: 400px; width: 100%; border-bottom: 5px solid #00F5A0; }
-        .form-container { padding: 20px; max-width: 400px; margin: auto; background: white; border-radius: 0 0 15px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #00F5A0; border: none; border-radius: 8px; color: #0052FF; font-weight: bold; cursor: pointer; }
+       <style>
+    /* Alapbeállítások: Teljes képernyős térkép */
+    body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    #map { height: 100vh; width: 100%; z-index: 1; }
+
+    /* Lebegő vezérlőpanel */
+    .form-container {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        width: 280px;
+        backdrop-filter: blur(5px); /* Modern üveghatás */
+        border: 1px solid #ddd;
+    }
+
+    h2 { margin-top: 0; color: #2c3e50; font-size: 1.2rem; text-align: center; }
+
+    /* Beviteli mezők stílusa */
+    input, select {
+        width: 100%;
+        padding: 10px;
+        margin: 8px 0;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        box-sizing: border-box; /* Hogy ne lógjon ki */
+        font-size: 14px;
+    }
+
+    /* A dögös gomb */
+    button {
+        width: 100%;
+        padding: 12px;
+        background-color: #f39c12; /* "Kamionos" sárga/narancs */
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 15px;
+        transition: background 0.3s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    button:hover {
+        background-color: #d35400; /* Sötétebb narancs ha rámutatsz */
+    }
+
+    /* Státusz üzenet */
+    #statusz {
+        margin-top: 10px;
+        color: #27ae60;
+        font-weight: 500;
+        text-align: center;
+        min-height: 20px;
+    }
+
+    /* Reszponzivitás mobilon */
+    @media (max-width: 480px) {
+        .form-container {
+            width: calc(100% - 40px);
+            top: 10px;
+            left: 10px;
+            padding: 15px;
+        }
+    }
+</style>
     </style>
 </head>
 <body>
