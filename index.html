@@ -3,167 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Térkép</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>NextLoad - Flottatérkép</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-       <style>
-    /* Alapbeállítások: Teljes képernyős térkép */
-    body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    #map { height: 100vh; width: 100%; z-index: 1; }
-
-    /* Lebegő vezérlőpanel */
-    .form-container {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.95);
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        width: 280px;
-        backdrop-filter: blur(5px); /* Modern üveghatás */
-        border: 1px solid #ddd;
-    }
-
-    h2 { margin-top: 0; color: #2c3e50; font-size: 1.2rem; text-align: center; }
-
-    /* Beviteli mezők stílusa */
-    input, select {
-        width: 100%;
-        padding: 10px;
-        margin: 8px 0;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        box-sizing: border-box; /* Hogy ne lógjon ki */
-        font-size: 14px;
-    }
-
-    /* A dögös gomb */
-    button {
-        width: 100%;
-        padding: 12px;
-        background-color: #f39c12; /* "Kamionos" sárga/narancs */
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 15px;
-        transition: background 0.3s;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    button:hover {
-        background-color: #d35400; /* Sötétebb narancs ha rámutatsz */
-    }
-
-    /* Státusz üzenet */
-    #statusz {
-        margin-top: 10px;
-        color: #27ae60;
-        font-weight: 500;
-        text-align: center;
-        min-height: 20px;
-    }
-
-    /* Reszponzivitás mobilon */
-    @media (max-width: 480px) {
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
         .form-container {
-            width: calc(100% - 40px);
-            top: 10px;
-            left: 10px;
-            padding: 15px;
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.9); padding: 20px;
+            border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            width: 260px; backdrop-filter: blur(5px);
         }
-    }
-</style>
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #d35400; }
+        #statusz { text-align: center; font-size: 0.8rem; color: #27ae60; }
     </style>
 </head>
 <body>
 
-<div class="header"><h1>NextLoad Live</h1></div>
-<div id="map"></div> <div class="form-container">
-    <input type="text" id="neved" placeholder="Fuvarozó neve">
+<div class="form-container">
+    <h2 style="margin:0 0 10px 0; font-size: 1.1rem; text-align:center;">NextLoad Tracking</h2>
+    <input type="text" id="neved" placeholder="Sofőr neve">
     <select id="auto">
-        <option value="furgon">Furgon</option>
-        <option value="kamion">Kamion</option>
+        <option value="kamion">Kamion 🚛</option>
+        <option value="furgon">Furgon 🚚</option>
+        <option value="puttonyos">Puttonyos 🚗</option>
     </select>
-    <button onclick="csatlakozas()">Aktiválás és Pozíció küldése</button>
-    <p id="statusz" style="text-align:center; font-weight:bold;"></p>
+    <button onclick="csatlakozas()">ONLINE LESZEK</button>
+    <p id="statusz"></p>
 </div>
 
+<div id="map"></div>
+
 <script>
-    const SB_URL = 'https://sqnwvposgbnhsfzdajib.supabase.co';
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I'; // <--- EZT PÓTOLD!
+    // IDE ÍRD BE A SAJÁT ADATAIDAT!
+    const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    // Térkép inicializálása (Alapból Budapestet mutatja)
-    var map = L.map('map').setView([47.4979, 19.0402], 13);
+    var map = L.map('map').setView([47.4979, 19.0402], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    var marker;
 
-    // GPS pozíció lekérése
-    navigator.geolocation.getCurrentPosition(function(pos) {
-        var lat = pos.coords.latitude;
-        var lng = pos.coords.longitude;
-        map.setView([lat, lng], 15);
-        marker = L.marker([lat, lng]).addTo(map).bindPopup("Te itt vagy!").openPopup();
-    });
+    async function betoltes() {
+        const { data, error } = await supabaseClient.from('carriers').select('*');
+        if (error) return;
+
+        map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
+
+        data.forEach(c => {
+            if (c.last_location_lat && c.last_location_lng) {
+                let ikon = c.vehicle_type === 'kamion' ? '🚛' : c.vehicle_type === 'furgon' ? '🚚' : '🚗';
+                L.marker([c.last_location_lat, c.last_location_lng]).addTo(map)
+                .bindPopup(`<div style="text-align:center;"><div style="font-size:1.5rem;">${ikon}</div><b>${c.full_name}</b><br>${c.vehicle_type}</div>`);
+            }
+        });
+    }
 
     async function csatlakozas() {
         const nev = document.getElementById('neved').value;
-        const jarmu = document.getElementById('auto').value;
-        const kiiras = document.getElementById('statusz');
-// Ez a függvény letölti az összes fuvarozót és kirakja őket a térképre
-    async function fuvarozokBetoltese() {
-        const { data: carriers, error } = await supabaseClient
-            .from('carriers')
-            .select('*')
-            .eq('is_online', true); // Csak azokat kérjük le, akik online vannak
+        const auto = document.getElementById('auto').value;
+        if (!nev) return alert("Add meg a neved!");
 
-        if (error) {
-            console.error("Hiba a lekéréskor:", error);
-            return;
-        }
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
 
-        // Végigmegyünk a listán és mindenkit kirakunk
-        carriers.forEach(fuv => {
-            if (fuv.last_location_lat && fuv.last_location_lng) {
-                L.marker([fuv.last_location_lat, fuv.last_location_lng])
-                    .addTo(map)
-                    .bindPopup(`<b>${fuv.full_name}</b><br>Jármű: ${fuv.vehicle_type}`);
-            }
+            await supabaseClient.from('carriers').insert([
+                { full_name: nev, vehicle_type: auto, last_location_lat: lat, last_location_lng: lng, is_online: true }
+            ]);
+
+            document.getElementById('statusz').innerText = "Sikeresen csatlakoztál!";
+            map.setView([lat, lng], 13);
+            betoltes();
         });
     }
 
-    // Automatikusan indítsuk el a betöltést, amikor megnyílik az oldal
-    fuvarozokBetoltese();
-
-    // Frissítsük a csatlakozas függvény végét, hogy regisztráció után azonnal lássuk az újakat
-    // (Ezt a sort csak add hozzá a csatlakozas() függvény végéhez, ha nem akarod az egészet újraírni)
-        navigator.geolocation.getCurrentPosition(async function(pos) {
-            const { error } = await supabaseClient
-                .from('carriers')
-                .insert([{ 
-                    full_name: nev, 
-                    vehicle_type: jarmu,
-                    last_location_lat: pos.coords.latitude,
-                    last_location_lng: pos.coords.longitude,
-                    is_online: true
-                }]);
-
-            if (error) {
-                kiiras.innerText = "Hiba: " + error.message;
-            } else {
-                kiiras.innerText = "Sikeresen online vagy a térképen!";
-                kiiras.style.color = "green";
-            }
-        });
-    }
+    setInterval(betoltes, 5000); // 5 másodpercenként frissíti a térképet automatikusan
+    betoltes();
 </script>
+
 </body>
 </html>
