@@ -52,7 +52,33 @@
         const nev = document.getElementById('neved').value;
         const jarmu = document.getElementById('auto').value;
         const kiiras = document.getElementById('statusz');
+// Ez a függvény letölti az összes fuvarozót és kirakja őket a térképre
+    async function fuvarozokBetoltese() {
+        const { data: carriers, error } = await supabaseClient
+            .from('carriers')
+            .select('*')
+            .eq('is_online', true); // Csak azokat kérjük le, akik online vannak
 
+        if (error) {
+            console.error("Hiba a lekéréskor:", error);
+            return;
+        }
+
+        // Végigmegyünk a listán és mindenkit kirakunk
+        carriers.forEach(fuv => {
+            if (fuv.last_location_lat && fuv.last_location_lng) {
+                L.marker([fuv.last_location_lat, fuv.last_location_lng])
+                    .addTo(map)
+                    .bindPopup(`<b>${fuv.full_name}</b><br>Jármű: ${fuv.vehicle_type}`);
+            }
+        });
+    }
+
+    // Automatikusan indítsuk el a betöltést, amikor megnyílik az oldal
+    fuvarozokBetoltese();
+
+    // Frissítsük a csatlakozas függvény végét, hogy regisztráció után azonnal lássuk az újakat
+    // (Ezt a sort csak add hozzá a csatlakozas() függvény végéhez, ha nem akarod az egészet újraírni)
         navigator.geolocation.getCurrentPosition(async function(pos) {
             const { error } = await supabaseClient
                 .from('carriers')
