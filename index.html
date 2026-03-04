@@ -66,6 +66,7 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+    // Térkép alapbeállítása
     var map = L.map('map').setView([47.1625, 19.5033], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
@@ -84,10 +85,12 @@
             return;
         }
 
+        // Régi ikonok törlése
         map.eachLayer((layer) => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
         });
 
+        // Új ikonok felrakása
         data.forEach(c => {
             if (c.last_location_lat && c.last_location_lng) {
                 const customIcon = L.divIcon({
@@ -107,19 +110,19 @@
                     iconAnchor: [21, 21]
                 });
 
-               L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
-.addTo(map)
-.bindPopup(`
-    <div style="text-align: center; font-family: sans-serif;">
-        <b style="font-size: 16px;">${c.full_name}</b><br>
-        <span style="color: #27ae60; font-weight: bold;">Aktív sofőr 🚛</span><br>
-        <hr style="margin: 8px 0; border: 0.5px solid #eee;">
-        <div style="background: #f9f9f9; padding: 5px; border-radius: 5px;">
-            <b style="color: #2c3e50;">📍 Úticél:</b><br>
-            <span style="color: #e67e22; font-weight: bold;">${c.destination || 'Nincs megadva'}</span>
-        </div>
-    </div>
-`);
+                // JAVÍTOTT BUBORÉK (POPUP)
+                L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
+                .addTo(map)
+                .bindPopup(`
+                    <div style="text-align: center; font-family: sans-serif;">
+                        <b style="font-size: 16px;">${c.full_name}</b><br>
+                        <span style="color: #27ae60; font-weight: bold;">Aktív sofőr 🚛</span><br>
+                        <hr style="margin: 8px 0; border: 0.5px solid #eee;">
+                        <div style="background: #f9f9f9; padding: 5px; border-radius: 5px;">
+                            <b style="color: #2c3e50;">📍 Úticél:</b><br>
+                            <span style="color: #e67e22; font-weight: bold;">${c.destination || 'Nincs megadva'}</span>
+                        </div>
+                    </div>
                 `);
             }
         });
@@ -192,6 +195,5 @@
     setInterval(betoltes, 10000);
     betoltes();
 </script>
-
 </body>
 </html>
