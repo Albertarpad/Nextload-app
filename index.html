@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Stabil Flotta</title>
+    <title>NextLoad - Debug Mode</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; }
-        #map { height: 100vh; width: 100%; z-index: 1; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; background: #eee; }
         
         .form-container {
             position: absolute; top: 15px; left: 15px; z-index: 1000;
@@ -28,7 +28,7 @@
         .btn-on { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
         
-        #statusz { text-align: center; font-size: 0.8rem; margin-top: 8px; font-weight: bold; }
+        #statusz { text-align: center; font-size: 11px; margin-top: 8px; font-weight: bold; color: #555; word-wrap: break-word; }
     </style>
 </head>
 <body>
@@ -48,54 +48,59 @@
     <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
     <button class="btn-off" onclick="stop()" style="margin-top:5px;">MŰSZAK VÉGE</button>
     
-    <div id="statusz">Készen áll</div>
+    <div id="statusz">Várakozás...</div>
 </div>
 
 <div id="map"></div>
 
 <script>
-    // --- SUPABASE KAPCSOLAT ---
     const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    // Térkép inicializálása
-    var map = L.map('map').setView([47.16, 19.50], 7);
+    var map = L.map('map', { zoomControl: false }).setView([47.16, 19.50], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     let watchId = null;
 
-    // Térkép frissítése (Kék ikonokkal a biztos láthatóságért)
     async function frissit() {
+        console.log("Adatok lekérése...");
         const { data, error } = await supabaseClient
             .from('carriers')
             .select('*')
             .eq('is_online', true);
 
-        if (error) return;
+        if (error) {
+            document.getElementById('statusz').innerText = "DB Hiba: " + error.message;
+            return;
+        }
 
-        // Régi markerek törlése
+        // Törlés
         map.eachLayer((layer) => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
         });
 
-        if (data) {
+        if (data && data.length > 0) {
+            console.log("Talált sofőrök száma: ", data.length);
             data.forEach(c => {
                 if (c.last_location_lat && c.last_location_lng) {
-                    L.marker([c.last_location_lat, c.last_location_lng])
+                    L.marker([parseFloat(c.last_location_lat), parseFloat(c.last_location_lng)])
                     .addTo(map)
-                    .bindPopup(`<b>${c.full_name}</b><br>Jármű: ${c.vehicle_type || '🚛'}<br>📍 Úticél: ${c.destination || 'Úton'}`);
+                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type || '🚛'}<br>📍 ${c.destination || 'Úton'}`)
+                    .openPopup(); // Automatikusan nyissa ki, hogy lássuk!
                 }
             });
+        } else {
+            console.log("Nincs online sofőr.");
         }
     }
 
     function inditas() {
         const nev = document.getElementById('neved').value;
-        if (!nev) return alert("Név megadása kötelező!");
+        if (!nev) return alert("Név kell!");
 
         document.getElementById('statusz').innerText = "📍 GPS keresése...";
-        document.getElementById('statusz').style.color = "#f39c12";
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
 
@@ -103,8 +108,7 @@
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
 
-            // Mentés az adatbázisba
-            await supabaseClient.from('carriers').upsert([{ 
+            const { error } = await supabaseClient.from('carriers').upsert([{ 
                 full_name: nev, 
                 vehicle_type: document.getElementById('auto').value,
                 destination: document.getElementById('uticel').value,
@@ -113,16 +117,15 @@
                 is_online: true 
             }], { onConflict: 'full_name' });
 
-            // Fókuszálás a pozícióra
-            map.setView([lat, lng], 13);
-
-            document.getElementById('statusz').innerText = "📡 KÖVETÉS AKTÍV";
-            document.getElementById('statusz').style.color = "#27ae60";
-            
-            frissit(); 
+            if (error) {
+                document.getElementById('statusz').innerText = "Upsert Hiba: " + error.message;
+            } else {
+                map.setView([lat, lng], 13);
+                document.getElementById('statusz').innerText = "📡 ÉLŐ: " + nev;
+                frissit(); 
+            }
         }, (err) => {
-            document.getElementById('statusz').innerText = "Hiba: " + err.message;
-            document.getElementById('statusz').style.color = "#e74c3c";
+            document.getElementById('statusz').innerText = "GPS Hiba: " + err.message;
         }, { 
             enableHighAccuracy: false, 
             timeout: 10000 
@@ -132,18 +135,11 @@
     async function stop() {
         const nev = document.getElementById('neved').value;
         if (watchId) navigator.geolocation.clearWatch(watchId);
-        
-        await supabaseClient
-            .from('carriers')
-            .update({ is_online: false })
-            .eq('full_name', nev);
-
-        document.getElementById('statusz').innerText = "KIJELENTKEZVE";
-        document.getElementById('statusz').style.color = "#7f8c8d";
+        await supabaseClient.from('carriers').update({ is_online: false }).eq('full_name', nev);
+        document.getElementById('statusz').innerText = "KIKAPCSOLVA";
         frissit();
     }
 
-    // Frissítés 10 másodpercenként
     setInterval(frissit, 10000);
     frissit();
 </script>
