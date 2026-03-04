@@ -28,40 +28,46 @@
     <h2 style="margin:0 0 10px 0; font-size: 1.1rem; text-align:center;">NextLoad Tracking</h2>
     <input type="text" id="neved" placeholder="Sofőr neve">
     <select id="auto">
-        <option value="kamion">Kamion 🚛</option>
-        <option value="furgon">Furgon 🚚</option>
-        <option value="puttonyos">Puttonyos 🚗</option>
+        <option value="🚛">Kamion 🚛</option>
+        <option value="🚚">Furgon 🚚</option>
+        <option value="🚗">Puttonyos 🚗</option>
     </select>
     <button onclick="csatlakozas()">ONLINE LESZEK</button>
+    <button onclick="muszakVege()" style="background-color: #e74c3c; margin-top: 10px;">MŰSZAK VÉGE</button>
     <p id="statusz"></p>
 </div>
 
 <div id="map"></div>
 
 <script>
-    // --- IDE ÍRD BE A SAJÁT ADATAIDAT ---
-    const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
+    const SB_URL = "IDE_A_SUPABASE_URL";
+    const SB_KEY = "IDE_A_SUPABASE_KEY";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    var map = L.map('map').setView([47.1625, 19.5033], 7); // Magyarország közepe
+    var map = L.map('map').setView([47.1625, 19.5033], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let figyeloid = null;
 
     async function betoltes() {
-        const { data, error } = await supabaseClient.from('carriers').select('*');
+        const { data, error } = await supabaseClient.from('carriers').select('*').eq('is_online', true);
         if (error) return;
 
-        // Csak a jelölőket töröljük, a térképet nem
         map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
 
         data.forEach(c => {
             if (c.last_location_lat && c.last_location_lng) {
-                let ikon = c.vehicle_type === 'kamion' ? '🚛' : c.vehicle_type === 'furgon' ? '🚚' : '🚗';
-                L.marker([c.last_location_lat, c.last_location_lng])
+                // EGYEDI IKON LÉTREHOZÁSA (Emoji alapú)
+                const customIcon = L.divIcon({
+                    html: `<div style="font-size: 24px;">${c.vehicle_type}</div>`,
+                    className: 'dummy-class',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+
+                L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
                 .addTo(map)
-                .bindPopup(`<b>${c.full_name}</b><br>${ikon} ${c.vehicle_type}`);
+                .bindPopup(`<b>${c.full_name}</b><br>Státusz: Úton 🛣️`);
             }
         });
     }
@@ -96,9 +102,27 @@
         }, { enableHighAccuracy: true });
     }
 
-    setInterval(betoltes, 10000); // 10 másodpercenként frissít mindenkit
+    // ÚJ FUNKCIÓ: MŰSZAK VÉGE
+    async function muszakVege() {
+        const nev = document.getElementById('neved').value;
+        if (!nev) return alert("Ki akarsz jelentkezni? Add meg a neved!");
+
+        if (figyeloid) {
+            navigator.geolocation.clearWatch(figyeloid);
+            figyeloid = null;
+        }
+
+        const { error } = await supabaseClient
+            .from('carriers')
+            .update({ is_online: false })
+            .eq('full_name', nev);
+
+        if (!error) {
+            document.getElementById('statusz').innerText = "KIJELENTKEZVE (Műszak vége) 🏠";
+            betoltes(); // Frissítjük a térképet, hogy eltűnjünk
+        }
+    }
+
+    setInterval(betoltes, 10000);
     betoltes();
 </script>
-
-</body>
-</html>
