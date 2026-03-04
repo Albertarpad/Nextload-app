@@ -1,19 +1,13 @@
 <!DOCTYPE html>
 <html lang="hu">
 <head>
-   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Flottatérkép</title>
-    
+    <title>NextLoad - Élő Flotta</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <style>
-        /* Itt maradjon a korábbi design kódod */
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; }
         #map { height: 100vh; width: 100%; z-index: 1; }
         .form-container {
@@ -25,9 +19,7 @@
         input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
         button:hover { background-color: #d35400; }
-        #statusz { text-align: center; font-size: 0.8rem; color: #27ae60; }
-    </style>
-</head>
+        #statusz { text-align: center; font-size: 0.8rem; color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -47,68 +39,64 @@
 <div id="map"></div>
 
 <script>
-    // IDE ÍRD BE A SAJÁT ADATAIDAT!
+    // --- IDE ÍRD BE A SAJÁT ADATAIDAT ---
     const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    var map = L.map('map').setView([47.4979, 19.0402], 7);
+    var map = L.map('map').setView([47.1625, 19.5033], 7); // Magyarország közepe
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let figyeloid = null;
 
     async function betoltes() {
         const { data, error } = await supabaseClient.from('carriers').select('*');
         if (error) return;
 
+        // Csak a jelölőket töröljük, a térképet nem
         map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
 
         data.forEach(c => {
             if (c.last_location_lat && c.last_location_lng) {
                 let ikon = c.vehicle_type === 'kamion' ? '🚛' : c.vehicle_type === 'furgon' ? '🚚' : '🚗';
-                L.marker([c.last_location_lat, c.last_location_lng]).addTo(map)
-               .bindTooltip(`${c.full_name}`, { permanent: true, direction: 'top' });
+                L.marker([c.last_location_lat, c.last_location_lng])
+                .addTo(map)
+                .bindPopup(`<b>${c.full_name}</b><br>${ikon} ${c.vehicle_type}`);
             }
         });
     }
 
-  let figyeloid = null; 
+    async function csatlakozas() {
+        const nev = document.getElementById('neved').value;
+        const auto = document.getElementById('auto').value;
+        if (!nev) return alert("Add meg a neved!");
 
-async function csatlakozas() {
-    const nev = document.getElementById('neved').value;
-    const auto = document.getElementById('auto').value;
-    if (!nev) return alert("Add meg a neved!");
+        document.getElementById('statusz').innerText = "GPS keresése...";
 
-    document.getElementById('statusz').innerText = "GPS keresése...";
+        if (figyeloid) navigator.geolocation.clearWatch(figyeloid);
 
-    if (figyeloid) navigator.geolocation.clearWatch(figyeloid);
+        figyeloid = navigator.geolocation.watchPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
 
-    figyeloid = navigator.geolocation.watchPosition(async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+            await supabaseClient.from('carriers').upsert([
+                { 
+                    full_name: nev, 
+                    vehicle_type: auto, 
+                    last_location_lat: lat, 
+                    last_location_lng: lng, 
+                    is_online: true 
+                }
+            ], { onConflict: 'full_name' });
 
-        const { error } = await supabaseClient.from('carriers').upsert([
-            { 
-                full_name: nev, 
-                vehicle_type: auto, 
-                last_location_lat: lat, 
-                last_location_lng: lng, 
-                is_online: true 
-            }
-        ], { onConflict: 'full_name' });
-
-        if (error) console.error("Hiba:", error);
-        document.getElementById('statusz').innerText = "ÉLŐ KÖVETÉS AKTÍV 📡";
-        betoltes(); 
-    }, (err) => {
-        document.getElementById('statusz').innerText = "GPS hiba: " + err.message;
-    }, {
-        enableHighAccuracy: true,
-        maximumAge: 10000,
-        timeout: 5000
-    });
-}
+            document.getElementById('statusz').innerText = "ÉLŐ KÖVETÉS AKTÍV 📡";
+            betoltes(); 
+        }, (err) => {
+            document.getElementById('statusz').innerText = "GPS hiba: " + err.message;
+        }, { enableHighAccuracy: true });
     }
 
-    setInterval(betoltes, 5000); // 5 másodpercenként frissíti a térképet automatikusan
+    setInterval(betoltes, 10000); // 10 másodpercenként frissít mindenkit
     betoltes();
 </script>
 
