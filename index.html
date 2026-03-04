@@ -3,73 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Élő Flotta</title>
+    <title>NextLoad - Élő Flotta & Útvonal</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #map { height: 100vh; width: 100%; z-index: 1; }
+        
         .form-container {
             position: absolute; top: 20px; left: 20px; z-index: 1000;
-            background: rgba(255, 255, 255, 0.9); padding: 20px;
-            border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            width: 260px; backdrop-filter: blur(5px);
+            background: rgba(255, 255, 255, 0.95); padding: 20px;
+            border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 280px; backdrop-filter: blur(10px);
+            border: 1px solid #ddd;
         }
-        input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
-        button { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button:hover { background-color: #d35400; }
-        #statusz { text-align: center; font-size: 0.8rem; color: #27ae60; font-weight: bold; }
+        
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; text-align: center; color: #2c3e50; }
+        input, select, button { 
+            width: 100%; padding: 12px; margin: 8px 0; 
+            border-radius: 8px; border: 1px solid #ccc; 
+            box-sizing: border-box; font-size: 14px;
+        }
+        
+        .btn-online { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-online:hover { background-color: #e67e22; }
+        
+        .btn-offline { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-offline:hover { background-color: #c0392b; }
+        
+        #statusz { text-align: center; font-size: 0.85rem; margin-top: 10px; font-weight: bold; color: #27ae60; }
+        .custom-div-icon { background: none !important; border: none !important; }
     </style>
 </head>
 <body>
 
 <div class="form-container">
-    <h2 style="margin:0 0 10px 0; font-size: 1.1rem; text-align:center;">NextLoad Tracking</h2>
+    <h2>NextLoad Tracking</h2>
     <input type="text" id="neved" placeholder="Sofőr neve">
+    
     <select id="auto">
         <option value="🚛">Kamion 🚛</option>
         <option value="🚚">Furgon 🚚</option>
         <option value="🚗">Puttonyos 🚗</option>
     </select>
-    <input type="text" id="uticel" placeholder="Úticél (pl. Budapest, Váci út)">
     
-    <button onclick="csatlakozas()">ONLINE LESZEK</button>
-    <button onclick="muszakVege()" style="background-color: #e74c3c; margin-top: 10px;">MŰSZAK VÉGE</button>
+    <input type="text" id="uticel" placeholder="Úticél (pl. Budapest)">
+    
+    <button class="btn-online" onclick="csatlakozas()">ONLINE LESZEK</button>
+    <button class="btn-offline" onclick="muszakVege()">MŰSZAK VÉGE</button>
+    
     <p id="statusz"></p>
 </div>
 
 <div id="map"></div>
 
 <script>
+    // --- BEILLESZTETT SUPABASE ADATOK ---
     const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     var map = L.map('map').setView([47.1625, 19.5033], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
 
     let figyeloid = null;
 
     async function betoltes() {
-        const { data, error } = await supabaseClient.from('carriers').select('*').eq('is_online', true);
-        if (error) return;
+        const { data, error } = await supabaseClient
+            .from('carriers')
+            .select('*')
+            .eq('is_online', true);
 
-        map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
+        if (error) {
+            console.error("Hiba a letöltéskor:", error.message);
+            return;
+        }
+
+        map.eachLayer((layer) => {
+            if (layer instanceof L.Marker) map.removeLayer(layer);
+        });
 
         data.forEach(c => {
             if (c.last_location_lat && c.last_location_lng) {
-                // EGYEDI IKON LÉTREHOZÁSA (Emoji alapú)
                 const customIcon = L.divIcon({
-                    html: `<div style="font-size: 24px;">${c.vehicle_type}</div>`,
-                    className: 'dummy-class',
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
+                    html: `
+                        <div style="
+                            background-color: white; 
+                            border: 3px solid #f39c12; 
+                            border-radius: 50%; 
+                            width: 42px; height: 42px; 
+                            display: flex; align-items: center; justify-content: center; 
+                            font-size: 22px; 
+                            box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+                            ${c.vehicle_type}
+                        </div>`,
+                    className: 'custom-div-icon',
+                    iconSize: [42, 42],
+                    iconAnchor: [21, 21]
                 });
 
                 L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
                 .addTo(map)
-                .bindPopup(`<b>${c.full_name}</b><br>Státusz: Úton 🛣️`);
+                .bindPopup(`
+                    <div style="text-align: center; font-family: sans-serif;">
+                        <b style="font-size: 16px;">${c.full_name}</b><br>
+                        <hr style="margin: 5px 0; border: 0.5px solid #eee;">
+                        <b>📍 Úticél:</b><br>${c.destination || 'Nincs megadva'}
+                    </div>
+                `);
             }
         });
     }
@@ -77,9 +123,12 @@
     async function csatlakozas() {
         const nev = document.getElementById('neved').value;
         const auto = document.getElementById('auto').value;
-        if (!nev) return alert("Add meg a neved!");
+        const hova = document.getElementById('uticel').value;
 
-        document.getElementById('statusz').innerText = "GPS keresése...";
+        if (!nev) return alert("Kérlek, add meg a nevedet!");
+
+        document.getElementById('statusz').innerText = "📍 GPS keresése...";
+        document.getElementById('statusz').style.color = "#f39c12";
 
         if (figyeloid) navigator.geolocation.clearWatch(figyeloid);
 
@@ -87,27 +136,36 @@
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
 
-            await supabaseClient.from('carriers').upsert([
+            const { error } = await supabaseClient.from('carriers').upsert([
                 { 
                     full_name: nev, 
                     vehicle_type: auto, 
                     last_location_lat: lat, 
                     last_location_lng: lng, 
+                    destination: hova,
                     is_online: true 
                 }
             ], { onConflict: 'full_name' });
 
-            document.getElementById('statusz').innerText = "ÉLŐ KÖVETÉS AKTÍV 📡";
-            betoltes(); 
+            if (error) {
+                console.error("Adatbázis hiba:", error.message);
+            } else {
+                document.getElementById('statusz').innerText = "📡 ÉLŐ KÖVETÉS AKTÍV";
+                document.getElementById('statusz').style.color = "#27ae60";
+                betoltes(); 
+            }
         }, (err) => {
-            document.getElementById('statusz').innerText = "GPS hiba: " + err.message;
-        }, { enableHighAccuracy: true });
+            document.getElementById('statusz').innerText = "❌ GPS hiba: " + err.message;
+            document.getElementById('statusz').style.color = "#e74c3c";
+        }, { 
+            enableHighAccuracy: true,
+            maximumAge: 0 
+        });
     }
 
-    // ÚJ FUNKCIÓ: MŰSZAK VÉGE
     async function muszakVege() {
         const nev = document.getElementById('neved').value;
-        if (!nev) return alert("Ki akarsz jelentkezni? Add meg a neved!");
+        if (!nev) return alert("Add meg a neved a kijelentkezéshez!");
 
         if (figyeloid) {
             navigator.geolocation.clearWatch(figyeloid);
@@ -120,11 +178,15 @@
             .eq('full_name', nev);
 
         if (!error) {
-            document.getElementById('statusz').innerText = "KIJELENTKEZVE (Műszak vége) 🏠";
-            betoltes(); // Frissítjük a térképet, hogy eltűnjünk
+            document.getElementById('statusz').innerText = "🏠 MŰSZAK VÉGE - KIJELENTKEZVE";
+            document.getElementById('statusz').style.color = "#7f8c8d";
+            betoltes(); 
         }
     }
 
     setInterval(betoltes, 10000);
     betoltes();
 </script>
+
+</body>
+</html>
