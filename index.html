@@ -107,14 +107,19 @@
                     iconAnchor: [21, 21]
                 });
 
-                L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
-                .addTo(map)
-                .bindPopup(`
-                    <div style="text-align: center; font-family: sans-serif;">
-                        <b style="font-size: 16px;">${c.full_name}</b><br>
-                        <hr style="margin: 5px 0; border: 0.5px solid #eee;">
-                        <b>📍 Úticél:</b><br>${c.destination || 'Nincs megadva'}
-                    </div>
+               L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
+.addTo(map)
+.bindPopup(`
+    <div style="text-align: center; font-family: sans-serif;">
+        <b style="font-size: 16px;">${c.full_name}</b><br>
+        <span style="color: #27ae60; font-weight: bold;">Aktív sofőr 🚛</span><br>
+        <hr style="margin: 8px 0; border: 0.5px solid #eee;">
+        <div style="background: #f9f9f9; padding: 5px; border-radius: 5px;">
+            <b style="color: #2c3e50;">📍 Úticél:</b><br>
+            <span style="color: #e67e22; font-weight: bold;">${c.destination || 'Nincs megadva'}</span>
+        </div>
+    </div>
+`);
                 `);
             }
         });
