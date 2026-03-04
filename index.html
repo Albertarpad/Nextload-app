@@ -70,23 +70,42 @@
         });
     }
 
-    async function csatlakozas() {
-        const nev = document.getElementById('neved').value;
-        const auto = document.getElementById('auto').value;
-        if (!nev) return alert("Add meg a neved!");
+  let figyeloid = null; 
 
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
+async function csatlakozas() {
+    const nev = document.getElementById('neved').value;
+    const auto = document.getElementById('auto').value;
+    if (!nev) return alert("Add meg a neved!");
 
-            await supabaseClient.from('carriers').insert([
-                { full_name: nev, vehicle_type: auto, last_location_lat: lat, last_location_lng: lng, is_online: true }
-            ]);
+    document.getElementById('statusz').innerText = "GPS keresése...";
 
-            document.getElementById('statusz').innerText = "Sikeresen csatlakoztál!";
-            map.setView([lat, lng], 13);
-            betoltes();
-        });
+    if (figyeloid) navigator.geolocation.clearWatch(figyeloid);
+
+    figyeloid = navigator.geolocation.watchPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        const { error } = await supabaseClient.from('carriers').upsert([
+            { 
+                full_name: nev, 
+                vehicle_type: auto, 
+                last_location_lat: lat, 
+                last_location_lng: lng, 
+                is_online: true 
+            }
+        ], { onConflict: 'full_name' });
+
+        if (error) console.error("Hiba:", error);
+        document.getElementById('statusz').innerText = "ÉLŐ KÖVETÉS AKTÍV 📡";
+        betoltes(); 
+    }, (err) => {
+        document.getElementById('statusz').innerText = "GPS hiba: " + err.message;
+    }, {
+        enableHighAccuracy: true,
+        maximumAge: 10000,
+        timeout: 5000
+    });
+}
     }
 
     setInterval(betoltes, 5000); // 5 másodpercenként frissíti a térképet automatikusan
