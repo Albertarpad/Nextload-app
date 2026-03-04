@@ -3,22 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Debug Mode</title>
+    <title>NextLoad - Flotta & Útvonal</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         #map { height: 100vh; width: 100vw; background: #eee; }
         
         .form-container {
             position: absolute; top: 15px; left: 15px; z-index: 1000;
-            background: white; padding: 15px; border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 250px;
+            background: rgba(255, 255, 255, 0.95); padding: 15px;
+            border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 250px; border: 1px solid #ddd;
         }
         
+        h3 { margin: 0 0 10px 0; text-align: center; color: #2c3e50; }
         input, select, button { 
             width: 100%; padding: 10px; margin: 5px 0; 
             border-radius: 6px; border: 1px solid #ccc; 
@@ -26,15 +31,15 @@
         }
         
         .btn-on { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
-        .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; }
         
-        #statusz { text-align: center; font-size: 11px; margin-top: 8px; font-weight: bold; color: #555; word-wrap: break-word; }
+        #statusz { text-align: center; font-size: 11px; margin-top: 8px; font-weight: bold; color: #7f8c8d; }
     </style>
 </head>
 <body>
 
 <div class="form-container">
-    <h3 style="margin-top:0; text-align:center;">NextLoad</h3>
+    <h3>NextLoad Tracking</h3>
     <input type="text" id="neved" placeholder="Sofőr neve">
     
     <select id="auto">
@@ -43,64 +48,58 @@
         <option value="🚗">Puttonyos 🚗</option>
     </select>
     
-    <input type="text" id="uticel" placeholder="Úticél">
+    <input type="text" id="uticel" placeholder="Úticél (pl. Győr)">
     
     <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
-    <button class="btn-off" onclick="stop()" style="margin-top:5px;">MŰSZAK VÉGE</button>
+    <button class="btn-off" onclick="stop()">MŰSZAK VÉGE</button>
     
-    <div id="statusz">Várakozás...</div>
+    <div id="statusz">Holnapi terv: Útvonalvonal! 🗺️</div>
 </div>
 
 <div id="map"></div>
 
 <script>
+    // --- KONFIGURÁCIÓ ---
     const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    var map = L.map('map', { zoomControl: false }).setView([47.16, 19.50], 7);
+    var map = L.map('map').setView([47.16, 19.50], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     let watchId = null;
 
+    // Térkép frissítése
     async function frissit() {
-        console.log("Adatok lekérése...");
         const { data, error } = await supabaseClient
             .from('carriers')
             .select('*')
             .eq('is_online', true);
 
-        if (error) {
-            document.getElementById('statusz').innerText = "DB Hiba: " + error.message;
-            return;
-        }
+        if (error) return;
 
-        // Törlés
         map.eachLayer((layer) => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
         });
 
-        if (data && data.length > 0) {
-            console.log("Talált sofőrök száma: ", data.length);
+        if (data) {
             data.forEach(c => {
                 if (c.last_location_lat && c.last_location_lng) {
-                    L.marker([parseFloat(c.last_location_lat), parseFloat(c.last_location_lng)])
+                    L.marker([c.last_location_lat, c.last_location_lng])
                     .addTo(map)
-                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type || '🚛'}<br>📍 ${c.destination || 'Úton'}`)
-                    .openPopup(); // Automatikusan nyissa ki, hogy lássuk!
+                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type || '🚛'}<br>📍 Cél: ${c.destination || 'Úton'}`);
                 }
             });
-        } else {
-            console.log("Nincs online sofőr.");
         }
     }
 
     function inditas() {
         const nev = document.getElementById('neved').value;
+        const hova = document.getElementById('uticel').value;
         if (!nev) return alert("Név kell!");
 
-        document.getElementById('statusz').innerText = "📍 GPS keresése...";
+        document.getElementById('statusz').innerText = "📍 Pozíció keresése...";
+        document.getElementById('statusz').style.color = "#f39c12";
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
 
@@ -111,17 +110,18 @@
             const { error } = await supabaseClient.from('carriers').upsert([{ 
                 full_name: nev, 
                 vehicle_type: document.getElementById('auto').value,
-                destination: document.getElementById('uticel').value,
+                destination: hova, 
                 last_location_lat: lat, 
                 last_location_lng: lng, 
                 is_online: true 
             }], { onConflict: 'full_name' });
 
             if (error) {
-                document.getElementById('statusz').innerText = "Upsert Hiba: " + error.message;
+                document.getElementById('statusz').innerText = "DB Hiba: " + error.message;
             } else {
                 map.setView([lat, lng], 13);
                 document.getElementById('statusz').innerText = "📡 ÉLŐ: " + nev;
+                document.getElementById('statusz').style.color = "#27ae60";
                 frissit(); 
             }
         }, (err) => {
