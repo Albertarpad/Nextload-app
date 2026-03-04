@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Élő Flotta Követés</title>
+    <title>NextLoad - Élő Flotta</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; }
         #map { height: 100vh; width: 100%; z-index: 1; }
         
-        /* Vezérlőpult stílusa */
         .form-container {
             position: absolute; top: 15px; left: 15px; z-index: 1000;
             background: rgba(255, 255, 255, 0.95); padding: 15px;
@@ -21,7 +20,7 @@
             width: 250px; border: 1px solid #ddd;
         }
         
-        h3 { margin: 0 0 10px 0; text-align: center; color: #2c3e50; font-size: 1.1rem; }
+        h3 { margin: 0 0 10px 0; text-align: center; color: #2c3e50; }
         input, select, button { 
             width: 100%; padding: 10px; margin: 5px 0; 
             border-radius: 6px; border: 1px solid #ccc; 
@@ -58,18 +57,16 @@
 <div id="map"></div>
 
 <script>
-    // --- SUPABASE KAPCSOLAT ---
     const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    // Térkép alapbeállítása (Magyarország)
     var map = L.map('map').setView([47.16, 19.50], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let watchId = null;
 
-    // Térkép frissítése az összes online sofőrrel
+    // HIBAJAVÍTOTT MEGJELENÍTÉS
     async function frissit() {
         const { data, error } = await supabaseClient
             .from('carriers')
@@ -78,29 +75,35 @@
 
         if (error) return;
 
-        // Régi jelölők törlése
+        // Térkép takarítása
         map.eachLayer((layer) => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
         });
 
-        // Új jelölők felrakása
-        data.forEach(c => {
-            if (c.last_location_lat && c.last_location_lng) {
-                const customIcon = L.divIcon({
-                    html: `<div style="background:white; border:2px solid #f39c12; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${c.vehicle_type}</div>`,
-                    className: 'custom-div-icon',
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18]
-                });
+        if (data) {
+            data.forEach(c => {
+                // Csak akkor rajzolunk, ha vannak koordináták
+                if (c.last_location_lat && c.last_location_lng) {
+                    
+                    const iconEmoji = c.vehicle_type || "🚛";
+                    const nev = c.full_name || "Ismeretlen";
+                    const hova = c.destination || "Úton";
 
-                L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
-                .addTo(map)
-                .bindPopup(`<b>${c.full_name}</b><br>📍 Úticél: ${c.destination || 'Nincs megadva'}`);
-            }
-        });
+                    const customIcon = L.divIcon({
+                        html: `<div style="background:white; border:2px solid #f39c12; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${iconEmoji}</div>`,
+                        className: 'custom-div-icon',
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 18]
+                    });
+
+                    L.marker([c.last_location_lat, c.last_location_lng], { icon: customIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>${nev}</b><br>📍 Úticél: ${hova}`);
+                }
+            });
+        }
     }
 
-    // Bejelentkezés és GPS indítása
     function inditas() {
         const nev = document.getElementById('neved').value;
         if (!nev) return alert("Kérlek, add meg a neved!");
@@ -114,7 +117,7 @@
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
 
-            // Adatok mentése a Supabase-be
+            // Adatmentés
             await supabaseClient.from('carriers').upsert([{ 
                 full_name: nev, 
                 vehicle_type: document.getElementById('auto').value,
@@ -124,22 +127,23 @@
                 is_online: true 
             }], { onConflict: 'full_name' });
 
-            // A térkép ráközelít a sofőrre (csak az első alkalommal vagy manuálisan)
+            // Azonnali Zoom Pusztaszabolcsra (vagy ahol vagy)
             map.setView([lat, lng], 13);
 
             document.getElementById('statusz').innerText = "📡 KÖVETÉS AKTÍV";
             document.getElementById('statusz').style.color = "#27ae60";
+            
+            // Azonnali kirajzolás
             frissit(); 
         }, (err) => {
             document.getElementById('statusz').innerText = "GPS hiba: " + err.message;
             document.getElementById('statusz').style.color = "#e74c3c";
         }, { 
-            enableHighAccuracy: false, // Így gyorsabb és asztali gépen is jobb
+            enableHighAccuracy: false, 
             timeout: 10000 
         });
     }
 
-    // Kijelentkezés
     async function stop() {
         const nev = document.getElementById('neved').value;
         if (watchId) navigator.geolocation.clearWatch(watchId);
@@ -154,9 +158,8 @@
         frissit();
     }
 
-    // Automata frissítés 10 másodpercenként (hogy lásd a többieket is)
     setInterval(frissit, 10000);
-    frissit(); // Első betöltés
+    frissit();
 </script>
 
 </body>
