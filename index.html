@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Útvonaltervező</title>
+    <title>NextLoad - Flotta Követés</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -14,35 +14,39 @@
 
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; background: #eee; }
+        #map { height: 100vh; width: 100vw; background: #eee; z-index: 1; }
         
         .form-container {
             position: absolute; top: 15px; left: 15px; z-index: 1000;
-            background: rgba(255, 255, 255, 0.95); padding: 15px;
-            border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            width: 260px; border: 1px solid #ddd;
+            background: white; padding: 15px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 260px;
         }
         
-        h3 { margin: 0 0 10px 0; text-align: center; color: #2c3e50; }
+        #trip-info { 
+            background: #2c3e50; color: white; padding: 10px; 
+            border-radius: 6px; margin-bottom: 10px; font-size: 14px; 
+            text-align: center; display: none; font-weight: bold;
+        }
+
         input, select, button { 
             width: 100%; padding: 10px; margin: 5px 0; 
-            border-radius: 6px; border: 1px solid #ccc; 
-            box-sizing: border-box; font-size: 14px;
+            border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;
         }
         
         .btn-on { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
-        .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
         
         #statusz { text-align: center; font-size: 11px; margin-top: 8px; font-weight: bold; color: #7f8c8d; }
         
-        /* Útvonaltervező táblázat elrejtése (ne takarja a térképet) */
-        .leaflet-routing-container { display: none; }
+        /* Elrejtjük a gyári leírást */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
 
 <div class="form-container">
-    <h3>NextLoad Tracking</h3>
+    <div id="trip-info">Számítás...</div>
+    <h3 style="margin:0; text-align:center;">NextLoad</h3>
     <input type="text" id="neved" placeholder="Sofőr neve">
     
     <select id="auto">
@@ -51,12 +55,12 @@
         <option value="🚗">Puttonyos 🚗</option>
     </select>
     
-    <input type="text" id="uticel" placeholder="Úticél (pl. Budapest)">
+    <input type="text" id="uticel" placeholder="Célváros (pl. Győr)">
     
     <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
-    <button class="btn-off" onclick="stop()">MŰSZAK VÉGE</button>
+    <button class="btn-off" onclick="stop()" style="margin-top:5px;">MŰSZAK VÉGE</button>
     
-    <div id="statusz">Készen áll az indulásra! 🗺️</div>
+    <div id="statusz">Készen áll 🛤️</div>
 </div>
 
 <div id="map"></div>
@@ -71,8 +75,8 @@
 
     let watchId = null;
     let routingControl = null;
+    let markers = {};
 
-    // Térkép frissítése és útvonal rajzolása
     async function frissit() {
         const { data, error } = await supabaseClient
             .from('carriers')
@@ -81,63 +85,72 @@
 
         if (error) return;
 
-        // Markerek törlése (kivéve az útvonalvonalat)
-        map.eachLayer((layer) => {
-            if (layer instanceof L.Marker) map.removeLayer(layer);
-        });
+        // Markerek takarítása
+        Object.keys(markers).forEach(key => map.removeLayer(markers[key]));
+        markers = {};
 
         if (data) {
             data.forEach(c => {
                 if (c.last_location_lat && c.last_location_lng) {
                     const marker = L.marker([c.last_location_lat, c.last_location_lng])
-                    .addTo(map)
-                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type || '🚛'}<br>📍 Cél: ${c.destination || 'Úton'}`);
+                        .addTo(map)
+                        .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type || '🚛'}<br>📍 Cél: ${c.destination || 'Úton'}`);
                     
-                    // Ha az adott sofőr épp beírta az úticélt, és ő a felhasználó
-                    const sajatNev = document.getElementById('neved').value;
-                    if (c.full_name === sajatNev && c.destination) {
-                        tervezUtvonal(c.last_location_lat, c.last_location_lng, c.destination);
-                    }
+                    markers[c.full_name] = marker;
                 }
             });
         }
     }
 
-    // Útvonaltervezés koordináta és városnév alapján
-    async function tervezUtvonal(lat, lng, celvaros) {
-        if (routingControl) map.removeControl(routingControl);
+    async function tervezUtvonal(startLat, startLng, celvaros) {
+        if (!celvaros) return;
 
-        // Városnév keresése koordinátákká (Geocoding)
         try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${celvaros}`);
-            const results = await response.json();
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(celvaros)}`);
+            const results = await res.json();
 
-            if (results.length > 0) {
-                const celLat = results[0].lat;
-                const celLng = results[0].lon;
+            if (results && results.length > 0) {
+                const celLat = parseFloat(results[0].lat);
+                const celLng = parseFloat(results[0].lon);
+
+                // Régi vonal törlése, ha van
+                if (routingControl) {
+                    map.removeControl(routingControl);
+                }
 
                 routingControl = L.Routing.control({
                     waypoints: [
-                        L.latLng(lat, lng),
+                        L.latLng(startLat, startLng),
                         L.latLng(celLat, celLng)
                     ],
-                    lineOptions: { styles: [{ color: '#f39c12', weight: 5 }] },
-                    createMarker: function() { return null; }, // Ne tegyen plusz markert a célhoz
+                    lineOptions: {
+                        styles: [{ color: '#f39c12', weight: 7, opacity: 0.8 }]
+                    },
+                    createMarker: function() { return null; },
                     addWaypoints: false,
+                    draggableWaypoints: false,
                     routeWhileDragging: false
+                }).on('routesfound', function(e) {
+                    const route = e.routes[0];
+                    const distance = (route.summary.totalDistance / 1000).toFixed(1);
+                    const time = Math.round(route.summary.totalTime / 60);
+                    
+                    const infoBox = document.getElementById('trip-info');
+                    infoBox.style.display = 'block';
+                    infoBox.innerText = `🏁 ${celvaros}: ${distance} km (${Math.floor(time/60)}ó ${time%60}p)`;
                 }).addTo(map);
             }
-        } catch (e) {
-            console.log("Útvonaltervezési hiba: " + e.message);
+        } catch (err) {
+            console.error("Útvonal hiba:", err);
         }
     }
 
     function inditas() {
         const nev = document.getElementById('neved').value;
         const hova = document.getElementById('uticel').value;
-        if (!nev) return alert("Név kell!");
+        if (!nev) return alert("Név nélkül nem megy!");
 
-        document.getElementById('statusz').innerText = "📍 Pozíció keresése...";
+        document.getElementById('statusz').innerText = "📍 Kapcsolódás...";
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
 
@@ -154,28 +167,42 @@
                 is_online: true 
             }], { onConflict: 'full_name' });
 
+            if (hova) tervezUtvonal(lat, lng, hova);
+
             map.setView([lat, lng], 13);
-            document.getElementById('statusz').innerText = "📡 ÉLŐ: " + nev;
+            document.getElementById('statusz').innerText = "📡 ÉLŐ";
             frissit(); 
         }, (err) => {
             document.getElementById('statusz').innerText = "GPS Hiba: " + err.message;
-        }, { 
-            enableHighAccuracy: false, 
-            timeout: 10000 
-        });
+        }, { enableHighAccuracy: true });
     }
 
     async function stop() {
         const nev = document.getElementById('neved').value;
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        if (routingControl) map.removeControl(routingControl);
         
+        // 1. GPS leállítása
+        if (watchId) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+
+        // 2. Útvonalvonal és info doboz törlése a képernyőről
+        if (routingControl) {
+            map.removeControl(routingControl);
+            routingControl = null;
+        }
+        document.getElementById('trip-info').style.display = 'none';
+
+        // 3. Adatbázis frissítése
         await supabaseClient.from('carriers').update({ is_online: false }).eq('full_name', nev);
-        document.getElementById('statusz').innerText = "KIKAPCSOLVA";
+        
+        document.getElementById('statusz').innerText = "MŰSZAK VÉGE";
+        
+        // 4. Markerek frissítése (hogy a sajátunk is eltűnjön)
         frissit();
     }
 
-    setInterval(frissit, 15000); // 15 mp-re növeltem a kímélés miatt
+    setInterval(frissit, 15000);
     frissit();
 </script>
 
