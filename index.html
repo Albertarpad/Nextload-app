@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Flotta Követés</title>
+    <title>NextLoad - Flotta & Chat</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -16,6 +16,7 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         #map { height: 100vh; width: 100vw; background: #eee; z-index: 1; }
         
+        /* Konténer */
         .form-container {
             position: absolute; top: 15px; left: 15px; z-index: 1000;
             background: white; padding: 15px; border-radius: 12px;
@@ -24,7 +25,7 @@
         
         #trip-info { 
             background: #2c3e50; color: white; padding: 10px; 
-            border-radius: 6px; margin-bottom: 10px; font-size: 14px; 
+            border-radius: 6px; margin-bottom: 10px; font-size: 13px; 
             text-align: center; display: none; font-weight: bold;
         }
 
@@ -36,9 +37,23 @@
         .btn-on { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
         
-        #statusz { text-align: center; font-size: 11px; margin-top: 8px; font-weight: bold; color: #7f8c8d; }
-        
-        /* Elrejtjük a gyári leírást */
+        /* CHAT STÍLUS */
+        #chat-container {
+            position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+            width: 300px; height: 350px; background: white;
+            border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; overflow: hidden;
+            border: 1px solid #ddd;
+        }
+        #chat-header { background: #2c3e50; color: white; padding: 10px; font-weight: bold; text-align: center; }
+        #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #f9f9f9; }
+        #chat-input-area { display: flex; padding: 10px; background: white; border-top: 1px solid #eee; }
+        #chat-input-area input { flex: 1; margin: 0 5px 0 0; }
+        #chat-input-area button { width: 60px; margin: 0; background: #27ae60; color: white; border: none; cursor: pointer; }
+
+        .msg { margin-bottom: 8px; padding: 5px 8px; border-radius: 6px; background: #eef; }
+        .msg b { color: #2c3e50; font-size: 11px; display: block; }
+
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -55,12 +70,19 @@
         <option value="🚗">Puttonyos 🚗</option>
     </select>
     
-    <input type="text" id="uticel" placeholder="Célváros (pl. Győr)">
+    <input type="text" id="uticel" placeholder="Célváros">
     
     <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
     <button class="btn-off" onclick="stop()" style="margin-top:5px;">MŰSZAK VÉGE</button>
-    
-    <div id="statusz">Készen áll 🛤️</div>
+</div>
+
+<div id="chat-container">
+    <div id="chat-header">CB Rádió (Chat)</div>
+    <div id="chat-messages"></div>
+    <div id="chat-input-area">
+        <input type="text" id="chat-msg" placeholder="Üzenet..." onkeypress="if(event.key==='Enter') sendMsg()">
+        <button onclick="sendMsg()">Adás</button>
+    </div>
 </div>
 
 <div id="map"></div>
@@ -77,133 +99,95 @@
     let routingControl = null;
     let markers = {};
 
-    async function frissit() {
-        const { data, error } = await supabaseClient
-            .from('carriers')
-            .select('*')
-            .eq('is_online', true);
+    // --- CHAT FUNKCIÓK ---
+    async function sendMsg() {
+        const nev = document.getElementById('neved').value || "Ismeretlen";
+        const txt = document.getElementById('chat-msg').value;
+        if (!txt) return;
 
-        if (error) return;
+        await supabaseClient.from('messages').insert([{ sender_name: nev, message_text: txt }]);
+        document.getElementById('chat-msg').value = "";
+        loadMsgs();
+    }
 
-        // Markerek takarítása
-        Object.keys(markers).forEach(key => map.removeLayer(markers[key]));
-        markers = {};
-
+    async function loadMsgs() {
+        const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
         if (data) {
-            data.forEach(c => {
-                if (c.last_location_lat && c.last_location_lng) {
-                    const marker = L.marker([c.last_location_lat, c.last_location_lng])
-                        .addTo(map)
-                        .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type || '🚛'}<br>📍 Cél: ${c.destination || 'Úton'}`);
-                    
-                    markers[c.full_name] = marker;
-                }
-            });
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = data.map(m => `
+                <div class="msg">
+                    <b>${m.sender_name}</b>
+                    ${m.message_text}
+                </div>
+            `).reverse().join('');
+            container.scrollTop = container.scrollHeight;
         }
     }
 
-    async function tervezUtvonal(startLat, startLng, celvaros) {
-        if (!celvaros) return;
+    // --- TÉRKÉP ÉS GPS ---
+    async function frissit() {
+        const { data } = await supabaseClient.from('carriers').select('*').eq('is_online', true);
+        Object.keys(markers).forEach(k => map.removeLayer(markers[k]));
+        markers = {};
+        if (data) {
+            data.forEach(c => {
+                markers[c.full_name] = L.marker([c.last_location_lat, c.last_location_lng])
+                    .addTo(map)
+                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type}<br>📍 ${c.destination || 'Úton'}`);
+            });
+        }
+        loadMsgs(); // Üzenetek frissítése is
+    }
 
-        try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(celvaros)}`);
-            const results = await res.json();
-
-            if (results && results.length > 0) {
-                const celLat = parseFloat(results[0].lat);
-                const celLng = parseFloat(results[0].lon);
-
-                // Régi vonal törlése, ha van
-                if (routingControl) {
-                    map.removeControl(routingControl);
-                }
-
-                routingControl = L.Routing.control({
-                    waypoints: [
-                        L.latLng(startLat, startLng),
-                        L.latLng(celLat, celLng)
-                    ],
-                    lineOptions: {
-                        styles: [{ color: '#f39c12', weight: 7, opacity: 0.8 }]
-                    },
-                    createMarker: function() { return null; },
-                    addWaypoints: false,
-                    draggableWaypoints: false,
-                    routeWhileDragging: false
-                }).on('routesfound', function(e) {
-                    const route = e.routes[0];
-                    const distance = (route.summary.totalDistance / 1000).toFixed(1);
-                    const time = Math.round(route.summary.totalTime / 60);
-                    
-                    const infoBox = document.getElementById('trip-info');
-                    infoBox.style.display = 'block';
-                    infoBox.innerText = `🏁 ${celvaros}: ${distance} km (${Math.floor(time/60)}ó ${time%60}p)`;
-                }).addTo(map);
-            }
-        } catch (err) {
-            console.error("Útvonal hiba:", err);
+    async function tervezUtvonal(lat, lng, cel) {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cel)}`);
+        const results = await res.json();
+        if (results && results.length > 0) {
+            if (routingControl) map.removeControl(routingControl);
+            routingControl = L.Routing.control({
+                waypoints: [L.latLng(lat, lng), L.latLng(results[0].lat, results[0].lon)],
+                lineOptions: { styles: [{ color: '#f39c12', weight: 7 }] },
+                createMarker: () => null,
+                addWaypoints: false
+            }).on('routesfound', e => {
+                const r = e.routes[0];
+                const d = (r.summary.totalDistance / 1000).toFixed(1);
+                const t = Math.round(r.summary.totalTime / 60);
+                document.getElementById('trip-info').style.display = 'block';
+                document.getElementById('trip-info').innerText = `🏁 ${cel}: ${d} km (${Math.floor(t/60)}ó ${t%60}p)`;
+            }).addTo(map);
         }
     }
 
     function inditas() {
         const nev = document.getElementById('neved').value;
         const hova = document.getElementById('uticel').value;
-        if (!nev) return alert("Név nélkül nem megy!");
-
-        document.getElementById('statusz').innerText = "📍 Kapcsolódás...";
+        if (!nev) return alert("Név kell!");
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
-
-        watchId = navigator.geolocation.watchPosition(async (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-
+        watchId = navigator.geolocation.watchPosition(async pos => {
+            const { latitude: lat, longitude: lng } = pos.coords;
             await supabaseClient.from('carriers').upsert([{ 
-                full_name: nev, 
-                vehicle_type: document.getElementById('auto').value,
-                destination: hova, 
-                last_location_lat: lat, 
-                last_location_lng: lng, 
-                is_online: true 
+                full_name: nev, vehicle_type: document.getElementById('auto').value,
+                destination: hova, last_location_lat: lat, last_location_lng: lng, is_online: true 
             }], { onConflict: 'full_name' });
-
             if (hova) tervezUtvonal(lat, lng, hova);
-
             map.setView([lat, lng], 13);
-            document.getElementById('statusz').innerText = "📡 ÉLŐ";
-            frissit(); 
-        }, (err) => {
-            document.getElementById('statusz').innerText = "GPS Hiba: " + err.message;
-        }, { enableHighAccuracy: true });
+            frissit();
+        }, null, { enableHighAccuracy: true });
     }
 
     async function stop() {
         const nev = document.getElementById('neved').value;
-        
-        // 1. GPS leállítása
-        if (watchId) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-        }
-
-        // 2. Útvonalvonal és info doboz törlése a képernyőről
-        if (routingControl) {
-            map.removeControl(routingControl);
-            routingControl = null;
-        }
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        if (routingControl) map.removeControl(routingControl);
         document.getElementById('trip-info').style.display = 'none';
-
-        // 3. Adatbázis frissítése
         await supabaseClient.from('carriers').update({ is_online: false }).eq('full_name', nev);
-        
-        document.getElementById('statusz').innerText = "MŰSZAK VÉGE";
-        
-        // 4. Markerek frissítése (hogy a sajátunk is eltűnjön)
         frissit();
     }
 
-    setInterval(frissit, 15000);
-    frissit();
+    setInterval(frissit, 10000);
+    loadMsgs();
 </script>
 
 </body>
