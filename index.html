@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Flotta & Chat</title>
+    <title>NextLoad - Flotta & Chat Fix</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -16,43 +16,51 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         #map { height: 100vh; width: 100vw; background: #eee; z-index: 1; }
         
-        /* Konténer */
         .form-container {
-            position: absolute; top: 15px; left: 15px; z-index: 1000;
-            background: white; padding: 15px; border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 260px;
+            position: absolute; top: 10px; left: 10px; z-index: 2000;
+            background: white; padding: 12px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 240px;
         }
         
         #trip-info { 
-            background: #2c3e50; color: white; padding: 10px; 
-            border-radius: 6px; margin-bottom: 10px; font-size: 13px; 
+            background: #2c3e50; color: white; padding: 8px; 
+            border-radius: 6px; margin-bottom: 8px; font-size: 13px; 
             text-align: center; display: none; font-weight: bold;
         }
 
         input, select, button { 
-            width: 100%; padding: 10px; margin: 5px 0; 
+            width: 100%; padding: 10px; margin: 4px 0; 
             border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;
         }
         
         .btn-on { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
         
-        /* CHAT STÍLUS */
-        #chat-container {
-            position: absolute; bottom: 20px; right: 20px; z-index: 1000;
-            width: 300px; height: 350px; background: white;
-            border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            display: flex; flex-direction: column; overflow: hidden;
-            border: 1px solid #ddd;
+        #chat-wrapper {
+            position: absolute; bottom: 10px; right: 10px; z-index: 3000;
+            display: flex; flex-direction: column; align-items: flex-end;
         }
-        #chat-header { background: #2c3e50; color: white; padding: 10px; font-weight: bold; text-align: center; }
-        #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #f9f9f9; }
-        #chat-input-area { display: flex; padding: 10px; background: white; border-top: 1px solid #eee; }
-        #chat-input-area input { flex: 1; margin: 0 5px 0 0; }
-        #chat-input-area button { width: 60px; margin: 0; background: #27ae60; color: white; border: none; cursor: pointer; }
 
-        .msg { margin-bottom: 8px; padding: 5px 8px; border-radius: 6px; background: #eef; }
-        .msg b { color: #2c3e50; font-size: 11px; display: block; }
+        #chat-toggle {
+            background: #27ae60; color: white; border: none; padding: 12px 20px;
+            border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        #chat-container {
+            width: 300px; max-width: 90vw; height: 350px; background: white;
+            border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            display: none; flex-direction: column; overflow: hidden;
+            border: 1px solid #ddd; margin-bottom: 10px;
+        }
+
+        #chat-header { background: #2c3e50; color: white; padding: 10px; font-weight: bold; text-align: center; cursor: pointer; }
+        #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #fdfdfd; }
+        #chat-input-area { display: flex; padding: 8px; background: white; border-top: 1px solid #eee; }
+        #chat-input-area input { flex: 1; margin: 0 5px 0 0; padding: 8px; }
+        #chat-input-area button { width: 60px; padding: 8px; background: #27ae60; color: white; border: none; font-size: 12px; }
+
+        .msg { margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; background: #f0f0ff; border-left: 4px solid #27ae60; }
+        .msg b { color: #2c3e50; font-size: 11px; display: block; margin-bottom: 2px; }
 
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -61,28 +69,28 @@
 
 <div class="form-container">
     <div id="trip-info">Számítás...</div>
-    <h3 style="margin:0; text-align:center;">NextLoad</h3>
+    <h3 style="margin:0 0 8px 0; text-align:center; font-size: 18px;">NextLoad</h3>
     <input type="text" id="neved" placeholder="Sofőr neve">
-    
     <select id="auto">
         <option value="🚛">Kamion 🚛</option>
         <option value="🚚">Furgon 🚚</option>
         <option value="🚗">Puttonyos 🚗</option>
     </select>
-    
-    <input type="text" id="uticel" placeholder="Célváros">
-    
+    <input type="text" id="uticel" placeholder="Úticél">
     <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
-    <button class="btn-off" onclick="stop()" style="margin-top:5px;">MŰSZAK VÉGE</button>
+    <button class="btn-off" onclick="stop()" style="margin-top:4px;">MŰSZAK VÉGE</button>
 </div>
 
-<div id="chat-container">
-    <div id="chat-header">CB Rádió (Chat)</div>
-    <div id="chat-messages"></div>
-    <div id="chat-input-area">
-        <input type="text" id="chat-msg" placeholder="Üzenet..." onkeypress="if(event.key==='Enter') sendMsg()">
-        <button onclick="sendMsg()">Adás</button>
+<div id="chat-wrapper">
+    <div id="chat-container">
+        <div id="chat-header" onclick="toggleChat()">CB Rádió (Bezárás)</div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-msg" placeholder="Üzenet..." onkeypress="if(event.key==='Enter') sendMsg()">
+            <button onclick="sendMsg()">KÜLD</button>
+        </div>
     </div>
+    <button id="chat-toggle" onclick="toggleChat()">💬 Chat / CB</button>
 </div>
 
 <div id="map"></div>
@@ -92,39 +100,45 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    var map = L.map('map').setView([47.16, 19.50], 7);
+    var map = L.map('map', { zoomControl: false }).setView([47.16, 19.50], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(map);
 
     let watchId = null;
     let routingControl = null;
     let markers = {};
 
-    // --- CHAT FUNKCIÓK ---
-    async function sendMsg() {
-        const nev = document.getElementById('neved').value || "Ismeretlen";
-        const txt = document.getElementById('chat-msg').value;
-        if (!txt) return;
+    function toggleChat() {
+        const chat = document.getElementById('chat-container');
+        chat.style.display = (chat.style.display === 'flex') ? 'none' : 'flex';
+        if (chat.style.display === 'flex') loadMsgs();
+    }
 
-        await supabaseClient.from('messages').insert([{ sender_name: nev, message_text: txt }]);
-        document.getElementById('chat-msg').value = "";
+    async function sendMsg() {
+        const nev = document.getElementById('neved').value || "Sofőr";
+        const input = document.getElementById('chat-msg');
+        if (!input.value.trim()) return;
+
+        const { error } = await supabaseClient.from('messages').insert([{ sender_name: nev, message_text: input.value }]);
+        if (error) console.error("Chat hiba:", error.message);
+        
+        input.value = "";
         loadMsgs();
     }
 
     async function loadMsgs() {
-        const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
+        const { data, error } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
+        if (error) {
+            console.error("Üzenetbetöltési hiba:", error.message);
+            return;
+        }
         if (data) {
             const container = document.getElementById('chat-messages');
-            container.innerHTML = data.map(m => `
-                <div class="msg">
-                    <b>${m.sender_name}</b>
-                    ${m.message_text}
-                </div>
-            `).reverse().join('');
+            container.innerHTML = data.map(m => `<div class="msg"><b>${m.sender_name}</b>${m.message_text}</div>`).reverse().join('');
             container.scrollTop = container.scrollHeight;
         }
     }
 
-    // --- TÉRKÉP ÉS GPS ---
     async function frissit() {
         const { data } = await supabaseClient.from('carriers').select('*').eq('is_online', true);
         Object.keys(markers).forEach(k => map.removeLayer(markers[k]));
@@ -136,7 +150,7 @@
                     .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type}<br>📍 ${c.destination || 'Úton'}`);
             });
         }
-        loadMsgs(); // Üzenetek frissítése is
+        if (document.getElementById('chat-container').style.display === 'flex') loadMsgs();
     }
 
     async function tervezUtvonal(lat, lng, cel) {
@@ -146,7 +160,7 @@
             if (routingControl) map.removeControl(routingControl);
             routingControl = L.Routing.control({
                 waypoints: [L.latLng(lat, lng), L.latLng(results[0].lat, results[0].lon)],
-                lineOptions: { styles: [{ color: '#f39c12', weight: 7 }] },
+                lineOptions: { styles: [{ color: '#f39c12', weight: 7, opacity: 0.8 }] },
                 createMarker: () => null,
                 addWaypoints: false
             }).on('routesfound', e => {
@@ -162,7 +176,7 @@
     function inditas() {
         const nev = document.getElementById('neved').value;
         const hova = document.getElementById('uticel').value;
-        if (!nev) return alert("Név kell!");
+        if (!nev) return alert("Név nélkül nem leszel látható!");
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = navigator.geolocation.watchPosition(async pos => {
