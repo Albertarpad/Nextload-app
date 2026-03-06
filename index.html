@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NextLoad - Logisztika & Rating Fix</title>
+    <title>NextLoad - Logisztika & Rating</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -28,11 +28,10 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 220px; display: none;
         }
         
-        @media (max-width: 768px) { .form-container { width: 190px; } }
-
         .toggle-ui-btn { background: #2c3e50; color: white; border: none; padding: 6px; border-radius: 6px; font-size: 11px; cursor: pointer; margin-bottom: 5px; width: 100%; font-weight: bold; }
         #speedometer { background: #27ae60; color: white; padding: 8px; border-radius: 6px; margin-bottom: 8px; font-size: 20px; text-align: center; font-weight: bold; display: none; }
         #trip-info { background: #2c3e50; color: white; padding: 5px; border-radius: 4px; font-size: 11px; text-align: center; margin-bottom: 5px; display: none; }
+        .rating-display { font-size: 12px; color: #f39c12; font-weight: bold; margin-bottom: 5px; text-align: center; }
 
         input, select, button { width: 100%; padding: 10px; margin: 4px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 13px; }
         .btn-main { background: #2980b9; color: white; border: none; font-weight: bold; cursor: pointer; }
@@ -50,13 +49,15 @@
         .msg { margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; background: #f0f0ff; border-left: 4px solid #27ae60; cursor: pointer; }
         .carrier-item { background: #e3f2fd; padding: 6px; margin-bottom: 4px; border-radius: 6px; font-size: 11px; border-left: 4px solid #2980b9; cursor: pointer; }
 
+        /* ÉRTÉKELŐ MODAL - EZT KELLESZ KERESNI */
         #rating-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            z-index: 10000; display: none; text-align: center; width: 250px;
+            background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0 50px rgba(0,0,0,0.6);
+            z-index: 10000; display: none; text-align: center; width: 280px; border: 3px solid #f39c12;
         }
-        .stars { font-size: 24px; color: #f1c40f; margin: 10px 0; }
-        .stars span { cursor: pointer; transition: 0.2s; display: inline-block; padding: 0 2px; }
+        .stars { font-size: 35px; color: #f1c40f; margin: 15px 0; }
+        .stars span { cursor: pointer; display: inline-block; transition: transform 0.2s; }
+        .stars span:hover { transform: scale(1.3); }
 
         .leaflet-routing-container { display: none !important; }
     </style>
@@ -76,12 +77,12 @@
 </div>
 
 <div id="rating-modal">
-    <h4 id="rating-target-name" style="margin-top:0">Név</h4>
-    <p style="font-size: 12px;">Értékelés (1-5):</p>
+    <h3 id="rating-target-name" style="margin:0; color:#2c3e50;">Név</h3>
+    <p style="font-size: 14px; margin: 10px 0;">Hány csillagot adsz a munkájára?</p>
     <div class="stars">
         <span onclick="rate(1)">⭐</span><span onclick="rate(2)">⭐</span><span onclick="rate(3)">⭐</span><span onclick="rate(4)">⭐</span><span onclick="rate(5)">⭐</span>
     </div>
-    <button class="btn-off" onclick="closeRating()" style="background:#bdc3c7; font-size: 11px; margin-top: 10px;">MÉGSE</button>
+    <button class="btn-off" onclick="closeRating()" style="background:#95a5a6; padding: 8px;">MÉGSE</button>
 </div>
 
 <div id="driver-panel" class="form-container">
@@ -89,6 +90,7 @@
     <div id="driver-content">
         <div id="speedometer">0 km/h</div>
         <div id="trip-info"></div>
+        <div id="my-rating-driver" class="rating-display">Értékelésem: ⭐ 0.0</div>
         <h3 id="display-name" style="margin:5px 0; color:#2980b9; font-size: 13px;"></h3>
         <input type="text" id="uticel" placeholder="Úticél (Város)">
         <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
@@ -99,6 +101,7 @@
 <div id="client-panel" class="form-container">
     <button class="toggle-ui-btn" onclick="toggleUI('client-content')">MENÜ</button>
     <div id="client-content">
+        <div id="my-rating-client" class="rating-display"></div>
         <h3 id="display-client-name" style="margin:5px 0; color:#27ae60; font-size: 13px;"></h3>
         <input type="text" id="job-cargo" placeholder="Áru">
         <input type="text" id="job-pickup" placeholder="Honnan?">
@@ -147,22 +150,15 @@
     function closeRating() { document.getElementById('rating-modal').style.display = 'none'; }
 
     async function rate(stars) {
-        // Megpróbáljuk lekérni a célszemélyt a carriers táblából
-        const { data, error } = await supabaseClient.from('carriers').select('rating_sum, rating_count').eq('full_name', ratingTarget).maybeSingle();
-        
+        const { data } = await supabaseClient.from('carriers').select('rating_sum, rating_count').eq('full_name', ratingTarget).maybeSingle();
         if (data) {
             await supabaseClient.from('carriers').update({
                 rating_sum: (data.rating_sum || 0) + stars,
                 rating_count: (data.rating_count || 0) + 1
             }).eq('full_name', ratingTarget);
         }
-
-        await supabaseClient.from('messages').insert([{ 
-            sender_name: "RENDSZER", 
-            message_text: `⭐ ${currentUser.name} -> ${stars} csillag -> ${ratingTarget}` 
-        }]);
-        
-        alert("Értékelve!");
+        await supabaseClient.from('messages').insert([{ sender_name: "RENDSZER", message_text: `⭐ ${currentUser.name} ${stars} csillagot adott neki: ${ratingTarget}` }]);
+        alert("Sikeres értékelés!");
         closeRating();
         frissit();
     }
@@ -172,13 +168,14 @@
         c.style.display = (c.style.display === 'none') ? 'block' : 'none';
     }
 
-    function login() {
+    async function login() {
         const n = document.getElementById('user-name').value;
         const r = document.getElementById('user-role').value;
         if (!n) return alert("Név!");
         currentUser.name = n; currentUser.role = r;
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('chat-wrapper').style.display = 'flex';
+        
         if (r === 'driver') {
             document.getElementById('driver-panel').style.display = 'block';
             document.getElementById('display-name').innerText = n;
@@ -206,48 +203,40 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    async function tervezUtvonal(lat, lng, cel) {
-        if (!cel) return;
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cel)}`);
-        const d = await res.json();
-        if (d && d.length > 0) {
-            if (routingControl) map.removeControl(routingControl);
-            routingControl = L.Routing.control({
-                waypoints: [L.latLng(lat, lng), L.latLng(d[0].lat, d[0].lon)],
-                lineOptions: { styles: [{ color: '#3498db', weight: 6 }] },
-                createMarker: () => null, addWaypoints: false
-            }).on('routesfound', e => {
-                const info = document.getElementById('trip-info');
-                info.style.display = 'block';
-                info.innerText = `🏁 ${cel}: ${(e.routes[0].summary.totalDistance/1000).toFixed(1)} km`;
-            }).addTo(map);
-        }
-    }
-
     async function frissit() {
-        const { data } = await supabaseClient.from('carriers').select('*').eq('is_online', true);
+        const { data } = await supabaseClient.from('carriers').select('*');
+        
+        // Frissítsük a saját értékelésünket a menüben
+        const me = data?.find(c => c.full_name === currentUser.name);
+        if (me) {
+            const ratingText = `Értékelésem: ⭐ ${(me.rating_avg || 0).toFixed(1)}`;
+            if (currentUser.role === 'driver') document.getElementById('my-rating-driver').innerText = ratingText;
+            else document.getElementById('my-rating-client').innerText = ratingText;
+        }
+
+        const onlineCarriers = data?.filter(c => c.is_online) || [];
         Object.keys(markers).forEach(k => map.removeLayer(markers[k]));
         markers = {};
 
-        if (data) {
-            let sorted = data;
-            if (currentUser.role === 'client' && currentUser.lat) {
-                sorted = data.map(c => ({
-                    ...c, dist: getDistance(currentUser.lat, currentUser.lng, c.last_location_lat, c.last_location_lng)
-                })).sort((a,b) => a.dist - b.dist);
+        let sorted = onlineCarriers;
+        if (currentUser.role === 'client' && currentUser.lat) {
+            sorted = onlineCarriers.map(c => ({
+                ...c, dist: getDistance(currentUser.lat, currentUser.lng, c.last_location_lat, c.last_location_lng)
+            })).sort((a,b) => a.dist - b.dist);
 
-                document.getElementById('drivers-list').innerHTML = sorted.map(c => `
-                    <div class="carrier-item" onclick="openRating('${c.full_name}')">
-                        <b>${c.full_name}</b> ⭐${(c.rating_avg || 0).toFixed(1)} (${c.dist.toFixed(1)} km)<br>
-                        <small>Cél: ${c.destination || '-'}</small>
-                    </div>
-                `).join('');
-            }
-            sorted.forEach(c => {
-                markers[c.full_name] = L.marker([c.last_location_lat, c.last_location_lng]).addTo(map)
-                    .bindPopup(`<b>${c.full_name}</b> ⭐${(c.rating_avg || 0).toFixed(1)}<br><button onclick="openRating('${c.full_name}')">Értékelés</button>`);
-            });
+            document.getElementById('drivers-list').innerHTML = sorted.map(c => `
+                <div class="carrier-item" onclick="openRating('${c.full_name}')">
+                    <b>${c.full_name}</b> ⭐${(c.rating_avg || 0).toFixed(1)} (${c.dist.toFixed(1)} km)<br>
+                    <small>Cél: ${c.destination || '-'}</small>
+                </div>
+            `).join('');
         }
+
+        sorted.forEach(c => {
+            markers[c.full_name] = L.marker([c.last_location_lat, c.last_location_lng]).addTo(map)
+                .bindPopup(`<b>${c.full_name}</b> ⭐${(c.rating_avg || 0).toFixed(1)}<br><button onclick="openRating('${c.full_name}')">Értékelés</button>`);
+        });
+        
         loadMsgs();
     }
 
@@ -263,7 +252,6 @@
                 full_name: currentUser.name, last_location_lat: lat, last_location_lng: lng, 
                 speed: kmh, is_online: true, destination: h
             }], { onConflict: 'full_name' });
-            if (h) tervezUtvonal(lat, lng, h);
             map.setView([lat, lng], 13);
             frissit();
         }, null, { enableHighAccuracy: true });
@@ -272,8 +260,6 @@
     async function stop() {
         if (watchId) navigator.geolocation.clearWatch(watchId);
         document.getElementById('speedometer').style.display = 'none';
-        document.getElementById('trip-info').style.display = 'none';
-        if (routingControl) map.removeControl(routingControl);
         await supabaseClient.from('carriers').update({ is_online: false }).eq('full_name', currentUser.name);
         frissit();
     }
