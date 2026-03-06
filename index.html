@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Flotta & Chat</title>
+    <title>NextLoad - Flotta & Sebesség</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -22,6 +22,13 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 240px;
         }
         
+        /* Sebesség kijelző stílusa */
+        #speedometer {
+            background: #27ae60; color: white; padding: 10px; 
+            border-radius: 6px; margin-bottom: 8px; font-size: 18px; 
+            text-align: center; font-weight: bold; display: none;
+        }
+
         #trip-info { 
             background: #2c3e50; color: white; padding: 8px; 
             border-radius: 6px; margin-bottom: 8px; font-size: 13px; 
@@ -68,6 +75,7 @@
 <body>
 
 <div class="form-container">
+    <div id="speedometer">0 km/h</div>
     <div id="trip-info">Számítás...</div>
     <h3 style="margin:0 0 8px 0; text-align:center; font-size: 18px;">NextLoad</h3>
     <input type="text" id="neved" placeholder="Sofőr neve">
@@ -138,9 +146,10 @@
         markers = {};
         if (data) {
             data.forEach(c => {
+                const speedText = c.speed > 0 ? `<br><span style="color:#27ae60; font-weight:bold;">💨 ${c.speed} km/h</span>` : "<br><span style="color:#7f8c8d;">🛑 Áll</span>";
                 markers[c.full_name] = L.marker([c.last_location_lat, c.last_location_lng])
                     .addTo(map)
-                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type}<br>📍 ${c.destination || 'Úton'}`);
+                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type}${speedText}<br>📍 ${c.destination || 'Úton'}`);
             });
         }
         if (document.getElementById('chat-container').style.display === 'flex') loadMsgs();
@@ -170,13 +179,28 @@
         const nev = document.getElementById('neved').value;
         const hova = document.getElementById('uticel').value;
         if (!nev) return alert("Név nélkül nem látszol!");
+        
+        document.getElementById('speedometer').style.display = 'block';
+
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = navigator.geolocation.watchPosition(async pos => {
-            const { latitude: lat, longitude: lng } = pos.coords;
+            const { latitude: lat, longitude: lng, speed } = pos.coords;
+            
+            // Sebesség átváltása m/s-ról km/h-ra (ha a GPS ad értéket)
+            const kmh = speed ? Math.round(speed * 3.6) : 0;
+            document.getElementById('speedometer').innerText = kmh + " km/h";
+
+            // Mentés a DB-be (fontos: a carriers táblában legyen speed oszlop!)
             await supabaseClient.from('carriers').upsert([{ 
-                full_name: nev, vehicle_type: document.getElementById('auto').value,
-                destination: hova, last_location_lat: lat, last_location_lng: lng, is_online: true 
+                full_name: nev, 
+                vehicle_type: document.getElementById('auto').value,
+                destination: hova, 
+                last_location_lat: lat, 
+                last_location_lng: lng, 
+                speed: kmh, // Ezt küldjük
+                is_online: true 
             }], { onConflict: 'full_name' });
+
             if (hova) tervezUtvonal(lat, lng, hova);
             map.setView([lat, lng], 13);
             frissit();
@@ -188,7 +212,8 @@
         if (watchId) navigator.geolocation.clearWatch(watchId);
         if (routingControl) map.removeControl(routingControl);
         document.getElementById('trip-info').style.display = 'none';
-        await supabaseClient.from('carriers').update({ is_online: false }).eq('full_name', nev);
+        document.getElementById('speedometer').style.display = 'none';
+        await supabaseClient.from('carriers').update({ is_online: false, speed: 0 }).eq('full_name', nev);
         frissit();
     }
 
