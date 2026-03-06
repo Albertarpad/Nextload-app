@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NextLoad - Intelligens Logisztika</title>
+    <title>NextLoad - Közös Teszt Verzió</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -16,39 +16,43 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; background: #eee; }
         #map { height: 100vh; width: 100vw; position: absolute; top: 0; left: 0; z-index: 1; }
         
+        /* Belépő panel */
         #login-overlay {
             position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(44, 62, 80, 0.95);
             z-index: 9999; display: flex; align-items: center; justify-content: center; color: white;
         }
-        .login-box { background: white; color: #333; padding: 25px; border-radius: 15px; width: 85%; max-width: 320px; text-align: center; }
+        .login-box { background: white; color: #333; padding: 25px; border-radius: 15px; width: 85%; max-width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
 
+        /* Kezelőpanelek */
         .form-container {
             position: absolute; top: 10px; left: 10px; z-index: 2000;
             background: rgba(255, 255, 255, 0.95); padding: 10px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 220px;
-            display: none;
+            display: none; transition: 0.3s;
         }
         
         @media (max-width: 768px) { .form-container { width: 190px; } }
 
         .toggle-ui-btn { background: #2c3e50; color: white; border: none; padding: 6px; border-radius: 6px; font-size: 11px; cursor: pointer; margin-bottom: 5px; width: 100%; font-weight: bold; }
-        #speedometer { background: #27ae60; color: white; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 20px; text-align: center; font-weight: bold; display: none; }
+        #speedometer { background: #27ae60; color: white; padding: 8px; border-radius: 6px; margin-bottom: 8px; font-size: 20px; text-align: center; font-weight: bold; display: none; }
 
         input, select, button { width: 100%; padding: 10px; margin: 4px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 13px; }
         .btn-main { background: #2980b9; color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-on { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
         
+        /* Chat */
         #chat-wrapper { position: absolute; bottom: 15px; right: 15px; z-index: 3000; display: none; flex-direction: column; align-items: flex-end; }
         #chat-toggle { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         .new-msg-alert { background: #e74c3c !important; animation: pulse-red 1s infinite; }
         @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
         #chat-container { width: 300px; max-width: 80vw; height: 350px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: none; flex-direction: column; overflow: hidden; border: 1px solid #ddd; margin-bottom: 10px; }
-        #chat-header { background: #2c3e50; color: white; padding: 12px; font-weight: bold; text-align: center; }
+        #chat-header { background: #2c3e50; color: white; padding: 12px; font-weight: bold; text-align: center; cursor: pointer; }
         #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #fdfdfd; display: flex; flex-direction: column; }
         
         .msg { margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; background: #f0f0ff; border-left: 4px solid #27ae60; }
+        .msg b { color: #2c3e50; display: block; font-size: 11px; }
         .carrier-item { background: #e3f2fd; padding: 6px; margin-bottom: 4px; border-radius: 6px; font-size: 11px; border-left: 4px solid #2980b9; }
 
         .leaflet-routing-container { display: none !important; }
@@ -58,36 +62,36 @@
 
 <div id="login-overlay">
     <div class="login-box">
-        <h2 style="margin-top:0">NextLoad Login</h2>
-        <input type="text" id="user-name" placeholder="Név / Cégnév">
+        <h2 style="margin-top:0; color:#2c3e50;">NextLoad</h2>
+        <input type="text" id="user-name" placeholder="Teljes név / Cégnév">
         <select id="user-role">
-            <option value="driver">🚛 Sofőr</option>
-            <option value="client">💼 Megrendelő</option>
+            <option value="driver">🚛 Sofőr vagyok</option>
+            <option value="client">💼 Megrendelő vagyok</option>
         </select>
         <button class="btn-main" onclick="login()">BELÉPÉS</button>
     </div>
 </div>
 
 <div id="driver-panel" class="form-container">
-    <button class="toggle-ui-btn" onclick="toggleUI('driver-content')">MENÜ</button>
+    <button class="toggle-ui-btn" onclick="toggleUI('driver-content')">MENÜ ELREJTÉSE</button>
     <div id="driver-content">
         <div id="speedometer">0 km/h</div>
         <h3 id="display-name" style="margin:5px 0; color:#2980b9; font-size: 14px;"></h3>
-        <input type="text" id="uticel" placeholder="Úticél (Város)">
+        <input type="text" id="uticel" placeholder="Hová tartasz? (Város)">
         <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
-        <button class="btn-off" onclick="stop()">VÉGE</button>
+        <button class="btn-off" onclick="stop()">MŰSZAK VÉGE</button>
     </div>
 </div>
 
 <div id="client-panel" class="form-container">
-    <button class="toggle-ui-btn" onclick="toggleUI('client-content')">MENÜ</button>
+    <button class="toggle-ui-btn" onclick="toggleUI('client-content')">MENÜ ELREJTÉSE</button>
     <div id="client-content">
         <h3 id="display-client-name" style="margin:5px 0; color:#27ae60; font-size: 14px;"></h3>
         <input type="text" id="job-cargo" placeholder="Áru megnevezése">
-        <input type="text" id="job-pickup" placeholder="Honnan? (Város)">
-        <input type="text" id="job-dropoff" placeholder="Hová? (Város)">
-        <button class="btn-main" style="background:#27ae60" onclick="postJob()">KERESÉS</button>
-        <div id="nearby-drivers" style="margin-top:10px; max-height: 150px; overflow-y:auto;">
+        <input type="text" id="job-pickup" placeholder="Honnan?">
+        <input type="text" id="job-dropoff" placeholder="Hová?">
+        <button class="btn-main" style="background:#27ae60" onclick="postJob()">FUVARKERESÉS</button>
+        <div id="nearby-drivers" style="margin-top:10px; max-height: 150px; overflow-y:auto; border-top:1px solid #ddd; padding-top:5px;">
             <small><b>Közeli fuvarozók:</b></small>
             <div id="drivers-list"></div>
         </div>
@@ -96,11 +100,11 @@
 
 <div id="chat-wrapper">
     <div id="chat-container">
-        <div id="chat-header" onclick="toggleChat()">CB Rádió</div>
+        <div id="chat-header" onclick="toggleChat()">CB Rádió / Tőzsde</div>
         <div id="chat-messages"></div>
         <div style="display:flex; padding:8px; background:white; border-top:1px solid #eee;">
             <input type="text" id="chat-msg" placeholder="Üzenet..." onkeypress="if(event.key==='Enter') sendMsg()">
-            <button onclick="sendMsg()" style="width:60px; background:#27ae60; color:white; border:none; border-radius:6px; margin-left:5px;">KÜLD</button>
+            <button onclick="sendMsg()" style="width:60px; background:#27ae60; color:white; border:none; border-radius:6px; margin-left:5px; font-weight:bold;">KÜLD</button>
         </div>
     </div>
     <button id="chat-toggle" onclick="toggleChat()">💬 Chat</button>
@@ -121,13 +125,21 @@
 
     function toggleUI(id) {
         const content = document.getElementById(id);
-        content.style.display = (content.style.display === 'none') ? 'block' : 'none';
+        const btn = event.target;
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            btn.innerText = 'MENÜ ELREJTÉSE';
+        } else {
+            content.style.display = 'none';
+            btn.innerText = 'MENÜ MUTATÁSA';
+        }
     }
 
     function login() {
         const name = document.getElementById('user-name').value;
         const role = document.getElementById('user-role').value;
-        if (!name) return alert("Név!");
+        if (!name) return alert("Kérlek, add meg a neved!");
+        
         currentUser.name = name;
         currentUser.role = role;
         
@@ -136,17 +148,16 @@
 
         if (role === 'driver') {
             document.getElementById('driver-panel').style.display = 'block';
-            document.getElementById('display-name').innerText = name;
+            document.getElementById('display-name').innerText = "Szia, " + name + "!";
         } else {
             document.getElementById('client-panel').style.display = 'block';
-            document.getElementById('display-client-name').innerText = name;
-            figyeljMegrendelot(); // Megrendelő helyzetének követése
+            document.getElementById('display-client-name').innerText = name + " (Megrendelő)";
+            figyeljHelyzetre(); 
         }
         frissit();
     }
 
-    // Megrendelő GPS követése (hogy lássa ki van közel)
-    function figyeljMegrendelot() {
+    function figyeljHelyzetre() {
         navigator.geolocation.watchPosition(pos => {
             currentUser.lat = pos.coords.latitude;
             currentUser.lng = pos.coords.longitude;
@@ -154,7 +165,6 @@
         }, null, { enableHighAccuracy: true });
     }
 
-    // Távolság számítás (Haversine formula)
     function getDistance(lat1, lon1, lat2, lon2) {
         if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
         const R = 6371; 
@@ -174,16 +184,13 @@
 
         if (data) {
             let sortedData = data;
-
-            // Ha megrendelő vagyok, távolság alapján rendezünk
             if (currentUser.role === 'client' && currentUser.lat) {
                 sortedData = data.map(c => ({
                     ...c,
                     dist: getDistance(currentUser.lat, currentUser.lng, c.last_location_lat, c.last_location_lng)
                 })).sort((a, b) => a.dist - b.dist);
 
-                const list = document.getElementById('drivers-list');
-                list.innerHTML = sortedData.map(c => `
+                document.getElementById('drivers-list').innerHTML = sortedData.map(c => `
                     <div class="carrier-item">
                         <b>${c.full_name}</b> - ${c.dist.toFixed(1)} km<br>
                         <small>Cél: ${c.destination || 'Ismeretlen'}</small>
@@ -193,7 +200,7 @@
 
             sortedData.forEach(c => {
                 markers[c.full_name] = L.marker([c.last_location_lat, c.last_location_lng]).addTo(map)
-                    .bindPopup(`<b>${c.full_name}</b><br>Távolság: ${c.dist ? c.dist.toFixed(1)+' km' : '?'}`);
+                    .bindPopup(`<b>${c.full_name}</b><br>Sebesség: ${c.speed} km/h<br>Cél: ${c.destination || '-'}`);
             });
         }
         loadMsgs();
@@ -203,13 +210,13 @@
         const cargo = document.getElementById('job-cargo').value;
         const pickup = document.getElementById('job-pickup').value;
         const dropoff = document.getElementById('job-dropoff').value;
-        if(!cargo || !pickup || !dropoff) return alert("Adatok!");
+        if(!cargo || !pickup || !dropoff) return alert("Kérlek, tölts ki minden mezőt!");
         
         await supabaseClient.from('messages').insert([{ 
-            sender_name: "KERESÉS", 
-            message_text: `🔍 ${currentUser.name} fuvart keres: ${pickup} -> ${dropoff} (${cargo})` 
+            sender_name: "FUVARKERESÉS", 
+            message_text: `📢 ${currentUser.name}: ${pickup} -> ${dropoff} | Áru: ${cargo}` 
         }]);
-        alert("Keresés elküldve a chatbe!");
+        alert("Megbízás elküldve a közös tőzsdére!");
     }
 
     function toggleChat() {
@@ -226,14 +233,20 @@
         const input = document.getElementById('chat-msg');
         if (!input.value.trim()) return;
         await supabaseClient.from('messages').insert([{ sender_name: currentUser.name, message_text: input.value }]);
-        input.value = ""; loadMsgs();
+        input.value = ""; 
+        loadMsgs();
     }
 
     async function loadMsgs() {
         const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
         if (data) {
             const container = document.getElementById('chat-messages');
-            container.innerHTML = data.map(m => `<div class="msg"><b>${m.sender_name}</b>: ${m.message_text}</div>`).reverse().join('');
+            container.innerHTML = data.map(m => `
+                <div class="msg" style="${m.sender_name === 'FUVARKERESÉS' ? 'background:#fffbe6; border-left-color:#f39c12;' : ''}">
+                    <b>${m.sender_name}</b>
+                    ${m.message_text}
+                </div>
+            `).reverse().join('');
             container.scrollTop = container.scrollHeight;
             if (!chatOpen && lastMsgCount !== 0 && data.length > lastMsgCount) {
                 document.getElementById('chat-toggle').classList.add('new-msg-alert');
