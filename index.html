@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Flotta, Chat & Sebesség</title>
+    <title>NextLoad - Flotta, Sebesség & Élő Chat</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -52,6 +52,19 @@
         #chat-toggle {
             background: #27ae60; color: white; border: none; padding: 12px 20px;
             border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: background 0.3s;
+        }
+
+        /* Értesítés stílusa: villogó piros */
+        .new-msg-alert {
+            background: #e74c3c !important;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
 
         #chat-container {
@@ -116,11 +129,20 @@
     let watchId = null;
     let routingControl = null;
     let markers = {};
+    let lastMsgCount = 0;
+    let chatOpen = false;
 
     function toggleChat() {
         const chat = document.getElementById('chat-container');
-        chat.style.display = (chat.style.display === 'flex') ? 'none' : 'flex';
-        if (chat.style.display === 'flex') loadMsgs();
+        const btn = document.getElementById('chat-toggle');
+        chatOpen = (chat.style.display === 'flex') ? false : true;
+        chat.style.display = chatOpen ? 'flex' : 'none';
+        
+        if (chatOpen) {
+            btn.classList.remove('new-msg-alert');
+            btn.innerText = "💬 Chat / CB";
+            loadMsgs();
+        }
     }
 
     async function sendMsg() {
@@ -139,6 +161,14 @@
                 const container = document.getElementById('chat-messages');
                 container.innerHTML = data.map(m => `<div class="msg"><b>${m.sender_name}</b>${m.message_text}</div>`).reverse().join('');
                 container.scrollTop = container.scrollHeight;
+
+                // Értesítés kezelése
+                if (!chatOpen && data.length > 0 && lastMsgCount !== 0 && data.length > lastMsgCount) {
+                    const btn = document.getElementById('chat-toggle');
+                    btn.classList.add('new-msg-alert');
+                    btn.innerText = `💬 ÚJ ÜZENET!`;
+                }
+                lastMsgCount = data.length;
             }
         } catch(e) {}
     }
@@ -158,7 +188,7 @@
                 });
             }
         } catch(e) {}
-        if (document.getElementById('chat-container').style.display === 'flex') loadMsgs();
+        loadMsgs(); // Chat frissítés minden 10 másodperces ciklusban
     }
 
     async function tervezUtvonal(lat, lng, cel) {
@@ -170,7 +200,7 @@
                 routingControl = L.Routing.control({
                     waypoints: [L.latLng(lat, lng), L.latLng(results[0].lat, results[0].lon)],
                     lineOptions: { 
-                        styles: [{ color: '#3498db', weight: 6, opacity: 0.8 }] // Itt állítottam át kékre (#3498db)
+                        styles: [{ color: '#3498db', weight: 6, opacity: 0.8 }]
                     },
                     createMarker: () => null,
                     addWaypoints: false
@@ -219,7 +249,14 @@
         frissit();
     }
 
+    // Első betöltésnél inicializáljuk a chat számlálót
+    async function initChat() {
+        const { data } = await supabaseClient.from('messages').select('id');
+        if(data) lastMsgCount = data.length;
+    }
+
     setInterval(frissit, 10000);
+    initChat();
     loadMsgs();
 </script>
 
