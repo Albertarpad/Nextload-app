@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Flotta & Chat Fix</title>
+    <title>NextLoad - Flotta & Chat</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -54,12 +54,12 @@
         }
 
         #chat-header { background: #2c3e50; color: white; padding: 10px; font-weight: bold; text-align: center; cursor: pointer; }
-        #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #fdfdfd; }
+        #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #fdfdfd; display: flex; flex-direction: column; }
         #chat-input-area { display: flex; padding: 8px; background: white; border-top: 1px solid #eee; }
         #chat-input-area input { flex: 1; margin: 0 5px 0 0; padding: 8px; }
         #chat-input-area button { width: 60px; padding: 8px; background: #27ae60; color: white; border: none; font-size: 12px; }
 
-        .msg { margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; background: #f0f0ff; border-left: 4px solid #27ae60; }
+        .msg { margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; background: #f0f0ff; border-left: 4px solid #27ae60; word-break: break-word; }
         .msg b { color: #2c3e50; font-size: 11px; display: block; margin-bottom: 2px; }
 
         .leaflet-routing-container { display: none !important; }
@@ -118,20 +118,13 @@
         const nev = document.getElementById('neved').value || "Sofőr";
         const input = document.getElementById('chat-msg');
         if (!input.value.trim()) return;
-
-        const { error } = await supabaseClient.from('messages').insert([{ sender_name: nev, message_text: input.value }]);
-        if (error) console.error("Chat hiba:", error.message);
-        
+        await supabaseClient.from('messages').insert([{ sender_name: nev, message_text: input.value }]);
         input.value = "";
         loadMsgs();
     }
 
     async function loadMsgs() {
-        const { data, error } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
-        if (error) {
-            console.error("Üzenetbetöltési hiba:", error.message);
-            return;
-        }
+        const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
         if (data) {
             const container = document.getElementById('chat-messages');
             container.innerHTML = data.map(m => `<div class="msg"><b>${m.sender_name}</b>${m.message_text}</div>`).reverse().join('');
@@ -176,8 +169,7 @@
     function inditas() {
         const nev = document.getElementById('neved').value;
         const hova = document.getElementById('uticel').value;
-        if (!nev) return alert("Név nélkül nem leszel látható!");
-
+        if (!nev) return alert("Név nélkül nem látszol!");
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = navigator.geolocation.watchPosition(async pos => {
             const { latitude: lat, longitude: lng } = pos.coords;
