@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextLoad - Flotta & Sebesség</title>
+    <title>NextLoad - Flotta, Chat & Sebesség</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -13,20 +13,21 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; background: #eee; z-index: 1; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; background: #eee; }
+        #map { height: 100vh; width: 100vw; position: absolute; top: 0; left: 0; z-index: 1; }
         
+        /* Kontroll panel a bal felső sarokban */
         .form-container {
             position: absolute; top: 10px; left: 10px; z-index: 2000;
             background: white; padding: 12px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 240px;
         }
         
-        /* Sebesség kijelző stílusa */
         #speedometer {
             background: #27ae60; color: white; padding: 10px; 
-            border-radius: 6px; margin-bottom: 8px; font-size: 18px; 
+            border-radius: 6px; margin-bottom: 8px; font-size: 22px; 
             text-align: center; font-weight: bold; display: none;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
         }
 
         #trip-info { 
@@ -38,13 +39,15 @@
         input, select, button { 
             width: 100%; padding: 10px; margin: 4px 0; 
             border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;
+            font-size: 14px;
         }
         
         .btn-on { background-color: #f39c12; color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-off { background-color: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
         
+        /* Chat stílusa a jobb alsó sarokban */
         #chat-wrapper {
-            position: absolute; bottom: 10px; right: 10px; z-index: 3000;
+            position: absolute; bottom: 15px; right: 15px; z-index: 3000;
             display: flex; flex-direction: column; align-items: flex-end;
         }
 
@@ -54,17 +57,17 @@
         }
 
         #chat-container {
-            width: 300px; max-width: 90vw; height: 350px; background: white;
+            width: 300px; max-width: 85vw; height: 350px; background: white;
             border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             display: none; flex-direction: column; overflow: hidden;
             border: 1px solid #ddd; margin-bottom: 10px;
         }
 
-        #chat-header { background: #2c3e50; color: white; padding: 10px; font-weight: bold; text-align: center; cursor: pointer; }
+        #chat-header { background: #2c3e50; color: white; padding: 12px; font-weight: bold; text-align: center; cursor: pointer; }
         #chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; background: #fdfdfd; display: flex; flex-direction: column; }
         #chat-input-area { display: flex; padding: 8px; background: white; border-top: 1px solid #eee; }
-        #chat-input-area input { flex: 1; margin: 0 5px 0 0; padding: 8px; }
-        #chat-input-area button { width: 60px; padding: 8px; background: #27ae60; color: white; border: none; font-size: 12px; }
+        #chat-input-area input { flex: 1; margin-right: 5px; padding: 8px; }
+        #chat-input-area button { width: 70px; background: #27ae60; color: white; border: none; cursor: pointer; border-radius: 6px; }
 
         .msg { margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; background: #f0f0ff; border-left: 4px solid #27ae60; word-break: break-word; }
         .msg b { color: #2c3e50; font-size: 11px; display: block; margin-bottom: 2px; }
@@ -77,16 +80,16 @@
 <div class="form-container">
     <div id="speedometer">0 km/h</div>
     <div id="trip-info">Számítás...</div>
-    <h3 style="margin:0 0 8px 0; text-align:center; font-size: 18px;">NextLoad</h3>
+    <h3 style="margin:0 0 10px 0; text-align:center;">NextLoad</h3>
     <input type="text" id="neved" placeholder="Sofőr neve">
     <select id="auto">
         <option value="🚛">Kamion 🚛</option>
         <option value="🚚">Furgon 🚚</option>
         <option value="🚗">Puttonyos 🚗</option>
     </select>
-    <input type="text" id="uticel" placeholder="Úticél">
+    <input type="text" id="uticel" placeholder="Úticél város">
     <button class="btn-on" onclick="inditas()">ONLINE LESZEK</button>
-    <button class="btn-off" onclick="stop()" style="margin-top:4px;">MŰSZAK VÉGE</button>
+    <button class="btn-off" onclick="stop()" style="margin-top:5px;">MŰSZAK VÉGE</button>
 </div>
 
 <div id="chat-wrapper">
@@ -104,10 +107,12 @@
 <div id="map"></div>
 
 <script>
+    // Supabase beállítások
     const SB_URL = "https://sqnwvposgbnhsfzdajib.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxbnd2cG9zZ2JuaHNmemRhamliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzOTI3MTAsImV4cCI6MjA4Nzk2ODcxMH0.68q2MexdPzl_u_9LmbvUHG51xW1S6ph4y4q3RXK798I";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+    // Térkép inicializálása
     var map = L.map('map', { zoomControl: false }).setView([47.16, 19.50], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -132,73 +137,72 @@
     }
 
     async function loadMsgs() {
-        const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
-        if (data) {
-            const container = document.getElementById('chat-messages');
-            container.innerHTML = data.map(m => `<div class="msg"><b>${m.sender_name}</b>${m.message_text}</div>`).reverse().join('');
-            container.scrollTop = container.scrollHeight;
-        }
+        try {
+            const { data } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false }).limit(20);
+            if (data) {
+                const container = document.getElementById('chat-messages');
+                container.innerHTML = data.map(m => `<div class="msg"><b>${m.sender_name}</b>${m.message_text}</div>`).reverse().join('');
+                container.scrollTop = container.scrollHeight;
+            }
+        } catch(e) {}
     }
 
     async function frissit() {
-        const { data } = await supabaseClient.from('carriers').select('*').eq('is_online', true);
-        Object.keys(markers).forEach(k => map.removeLayer(markers[k]));
-        markers = {};
-        if (data) {
-            data.forEach(c => {
-                const speedText = c.speed > 0 ? `<br><span style="color:#27ae60; font-weight:bold;">💨 ${c.speed} km/h</span>` : "<br><span style="color:#7f8c8d;">🛑 Áll</span>";
-                markers[c.full_name] = L.marker([c.last_location_lat, c.last_location_lng])
-                    .addTo(map)
-                    .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type}${speedText}<br>📍 ${c.destination || 'Úton'}`);
-            });
-        }
+        try {
+            const { data } = await supabaseClient.from('carriers').select('*').eq('is_online', true);
+            Object.keys(markers).forEach(k => map.removeLayer(markers[k]));
+            markers = {};
+            if (data) {
+                data.forEach(c => {
+                    const spd = c.speed || 0;
+                    const status = spd > 0 ? `<br><b style="color:#27ae60;">💨 ${spd} km/h</b>` : `<br><b style="color:#e74c3c;">🛑 Áll</b>`;
+                    markers[c.full_name] = L.marker([c.last_location_lat, c.last_location_lng])
+                        .addTo(map)
+                        .bindPopup(`<b>${c.full_name}</b><br>${c.vehicle_type}${status}<br>📍 ${c.destination || 'Nincs cél'}`);
+                });
+            }
+        } catch(e) {}
         if (document.getElementById('chat-container').style.display === 'flex') loadMsgs();
     }
 
     async function tervezUtvonal(lat, lng, cel) {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cel)}`);
-        const results = await res.json();
-        if (results && results.length > 0) {
-            if (routingControl) map.removeControl(routingControl);
-            routingControl = L.Routing.control({
-                waypoints: [L.latLng(lat, lng), L.latLng(results[0].lat, results[0].lon)],
-                lineOptions: { styles: [{ color: '#f39c12', weight: 7, opacity: 0.8 }] },
-                createMarker: () => null,
-                addWaypoints: false
-            }).on('routesfound', e => {
-                const r = e.routes[0];
-                const d = (r.summary.totalDistance / 1000).toFixed(1);
-                const t = Math.round(r.summary.totalTime / 60);
-                document.getElementById('trip-info').style.display = 'block';
-                document.getElementById('trip-info').innerText = `🏁 ${cel}: ${d} km (${Math.floor(t/60)}ó ${t%60}p)`;
-            }).addTo(map);
-        }
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cel)}`);
+            const results = await res.json();
+            if (results && results.length > 0) {
+                if (routingControl) map.removeControl(routingControl);
+                routingControl = L.Routing.control({
+                    waypoints: [L.latLng(lat, lng), L.latLng(results[0].lat, results[0].lon)],
+                    lineOptions: { styles: [{ color: '#f39c12', weight: 6, opacity: 0.8 }] },
+                    createMarker: () => null,
+                    addWaypoints: false
+                }).on('routesfound', e => {
+                    const r = e.routes[0];
+                    const d = (r.summary.totalDistance / 1000).toFixed(1);
+                    const t = Math.round(r.summary.totalTime / 60);
+                    document.getElementById('trip-info').style.display = 'block';
+                    document.getElementById('trip-info').innerText = `🏁 ${cel}: ${d} km (${Math.floor(t/60)}ó ${t%60}p)`;
+                }).addTo(map);
+            }
+        } catch(e) {}
     }
 
     function inditas() {
         const nev = document.getElementById('neved').value;
         const hova = document.getElementById('uticel').value;
         if (!nev) return alert("Név nélkül nem látszol!");
-        
         document.getElementById('speedometer').style.display = 'block';
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = navigator.geolocation.watchPosition(async pos => {
             const { latitude: lat, longitude: lng, speed } = pos.coords;
-            
-            // Sebesség átváltása m/s-ról km/h-ra (ha a GPS ad értéket)
             const kmh = speed ? Math.round(speed * 3.6) : 0;
             document.getElementById('speedometer').innerText = kmh + " km/h";
 
-            // Mentés a DB-be (fontos: a carriers táblában legyen speed oszlop!)
             await supabaseClient.from('carriers').upsert([{ 
-                full_name: nev, 
-                vehicle_type: document.getElementById('auto').value,
-                destination: hova, 
-                last_location_lat: lat, 
-                last_location_lng: lng, 
-                speed: kmh, // Ezt küldjük
-                is_online: true 
+                full_name: nev, vehicle_type: document.getElementById('auto').value,
+                destination: hova, last_location_lat: lat, last_location_lng: lng, 
+                speed: kmh, is_online: true 
             }], { onConflict: 'full_name' });
 
             if (hova) tervezUtvonal(lat, lng, hova);
