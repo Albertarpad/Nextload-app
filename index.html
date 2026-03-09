@@ -48,6 +48,7 @@
         .msg { margin-bottom: 5px; padding: 5px 8px; border-radius: 5px; background: #eef; border-left: 3px solid #2980b9; }
 
         .hidden { display: none; }
+        /* Elrejtjük az alapértelmezett szöveges instrukciókat, hogy ne takarják el a térképet */
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
@@ -87,10 +88,10 @@
             <option value="Foglalt">Foglalt</option>
             <option value="Visszfuvart keres">Visszfuvart keres</option>
         </select>
-        <input type="text" id="target-city" placeholder="Célváros (Helyi tervezés)">
+        <input type="text" id="target-city" placeholder="Célváros">
         <div id="distance-info"></div>
-        <button class="btn-main" onclick="startNavigation()">TÁVOLSÁG SZÁMÍTÁSA</button>
-        <button id="btn-google-maps" class="btn-google" onclick="openExternalMaps()">GOOGLE NAVIGÁCIÓ</button>
+        <button class="btn-main" onclick="startNavigation()">ÚTVONALAK KERESÉSE</button>
+        <button id="btn-google-maps" class="btn-google" onclick="openExternalMaps()">MEGNYITÁS GOOGLE MAPS-BEN</button>
         <button class="btn-stop" onclick="stopShift()">MŰSZAK VÉGE</button>
     </div>
     <button onclick="logout()" style="margin-top:10px; font-size:10px;">Kijelentkezés</button>
@@ -184,7 +185,7 @@
 
     async function startNavigation() {
         const city = document.getElementById('target-city').value;
-        if (!city) return alert("Város?");
+        if (!city) return alert("Add meg a célvárost!");
         const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${city},Hungary`);
         const data = await resp.json();
         if (data && data.length > 0) {
@@ -196,14 +197,17 @@
                 
                 routingControl = L.Routing.control({
                     waypoints: [start, dest],
+                    routeWhileDragging: false,
+                    showAlternatives: true, // Ez engedélyezi a több útvonalat
+                    altLineOptions: { styles: [{color: 'black', opacity: 0.15, weight: 6}] },
                     lineOptions: { styles: [{ color: '#2980b9', weight: 6 }] },
                     createMarker: function() { return null; },
                     addWaypoints: false,
                     draggableWaypoints: false
                 }).on('routesfound', function(e) {
                     const routes = e.routes;
-                    const summary = routes[0].summary;
-                    document.getElementById('distance-info').innerText = "Távolság: " + Math.round(summary.totalDistance / 1000) + " km";
+                    const bestRoute = routes[0].summary;
+                    document.getElementById('distance-info').innerText = "Fő útvonal: " + Math.round(bestRoute.totalDistance / 1000) + " km";
                     document.getElementById('btn-google-maps').style.display = "block";
                 }).addTo(map);
                 
@@ -214,6 +218,7 @@
 
     function openExternalMaps() {
         if (targetCoords) {
+            // Ez a link felismeri, ha mobilon vagy, és megnyitja a gyári appot
             const url = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lon}&travelmode=driving`;
             window.open(url, '_blank');
         }
