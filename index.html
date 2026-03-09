@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NextLoad Pro - CB Rádió & Navigáció</title>
+    <title>NextLoad Pro</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
@@ -35,9 +35,8 @@
         
         #speedometer { background: #2c3e50; color: #2ecc71; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 24px; text-align: center; font-weight: bold; border: 2px solid #2ecc71; }
         
-        /* Chat & Értesítések */
         #chat-wrapper { position: absolute; bottom: 15px; right: 15px; z-index: 3000; display: none; flex-direction: column; align-items: flex-end; }
-        #chat-toggle { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.3s; }
+        #chat-toggle { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         
         @keyframes pulse-red { 0% { background: #27ae60; } 50% { background: #e67e22; transform: scale(1.05); } 100% { background: #27ae60; } }
         .new-msg-alert { animation: pulse-red 0.5s infinite; }
@@ -51,6 +50,8 @@
     </style>
 </head>
 <body>
+
+<div id="map"></div>
 
 <div id="login-overlay">
     <div class="login-box">
@@ -80,9 +81,9 @@
     <button id="btn-shift-start" class="btn-start" onclick="startShift()">MŰSZAK KEZDÉSE</button>
     <div id="active-shift-menu" class="hidden">
         <select id="driver-status" onchange="updateDB()">
-            <option value="free">🟢 Szabad</option>
-            <option value="busy">🔴 Fuvarban</option>
-            <option value="looking">🟡 Visszfuvart keres</option>
+            <option value="Szabad">Szabad</option>
+            <option value="Foglalt">Foglalt</option>
+            <option value="Visszfuvart keres">Visszfuvart keres</option>
         </select>
         <input type="text" id="target-city" placeholder="Célváros (Navigáció)">
         <button class="btn-main" onclick="startNavigation()">NAVIGÁCIÓ INDÍTÁSA</button>
@@ -169,7 +170,7 @@
         const updateData = {
             full_name: currentUser.user_metadata.company || currentUser.email,
             is_online: true,
-            status: document.getElementById('driver-status')?.value || 'free',
+            status: document.getElementById('driver-status')?.value || 'Szabad',
             destination: document.getElementById('target-city')?.value || ''
         };
         if (lat) { updateData.last_location_lat = lat; updateData.last_location_lng = lng; }
@@ -195,7 +196,7 @@
                 }).addTo(map);
                 updateDB();
             });
-        } else { alert("Város nem található."); }
+        }
     }
 
     function stopShift() {
@@ -252,6 +253,5 @@
     function logout() { supabaseClient.auth.signOut().then(() => location.reload()); }
     supabaseClient.auth.getUser().then(({data}) => { if (data.user) setupUI(data.user); });
 </script>
-<div id="map"></div>
 </body>
 </html>
