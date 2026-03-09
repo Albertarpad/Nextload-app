@@ -30,10 +30,12 @@
         
         input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 13px; }
         .btn-main { background: #2980b9; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-google { background: #4285F4; color: white; border: none; font-weight: bold; cursor: pointer; display: none; }
         .btn-start { background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-stop { background: #e74c3c; color: white; border: none; font-weight: bold; cursor: pointer; }
         
         #speedometer { background: #2c3e50; color: #2ecc71; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 24px; text-align: center; font-weight: bold; border: 2px solid #2ecc71; }
+        #distance-info { font-size: 14px; font-weight: bold; color: #2980b9; margin: 5px 0; text-align: center; }
         
         #chat-wrapper { position: absolute; bottom: 15px; right: 15px; z-index: 3000; display: none; flex-direction: column; align-items: flex-end; }
         #chat-toggle { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
@@ -85,8 +87,10 @@
             <option value="Foglalt">Foglalt</option>
             <option value="Visszfuvart keres">Visszfuvart keres</option>
         </select>
-        <input type="text" id="target-city" placeholder="Célváros (Navigáció)">
-        <button class="btn-main" onclick="startNavigation()">NAVIGÁCIÓ INDÍTÁSA</button>
+        <input type="text" id="target-city" placeholder="Célváros (Helyi tervezés)">
+        <div id="distance-info"></div>
+        <button class="btn-main" onclick="startNavigation()">TÁVOLSÁG SZÁMÍTÁSA</button>
+        <button id="btn-google-maps" class="btn-google" onclick="openExternalMaps()">GOOGLE NAVIGÁCIÓ</button>
         <button class="btn-stop" onclick="stopShift()">MŰSZAK VÉGE</button>
     </div>
     <button onclick="logout()" style="margin-top:10px; font-size:10px;">Kijelentkezés</button>
@@ -111,6 +115,7 @@
 
     let isRegistration = false, currentUser = null, watchId = null, routingControl = null;
     let myMarker = null, otherMarkers = {}, chatOpen = false, lastMsgCount = 0;
+    let targetCoords = null;
     const alertSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
 
     var map = L.map('map', { zoomControl: false }).setView([47.16, 19.50], 7);
@@ -183,19 +188,34 @@
         const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${city},Hungary`);
         const data = await resp.json();
         if (data && data.length > 0) {
+            targetCoords = { lat: data[0].lat, lon: data[0].lon };
             const dest = L.latLng(data[0].lat, data[0].lon);
             navigator.geolocation.getCurrentPosition(pos => {
                 const start = L.latLng(pos.coords.latitude, pos.coords.longitude);
                 if (routingControl) map.removeControl(routingControl);
+                
                 routingControl = L.Routing.control({
                     waypoints: [start, dest],
                     lineOptions: { styles: [{ color: '#2980b9', weight: 6 }] },
                     createMarker: function() { return null; },
                     addWaypoints: false,
                     draggableWaypoints: false
+                }).on('routesfound', function(e) {
+                    const routes = e.routes;
+                    const summary = routes[0].summary;
+                    document.getElementById('distance-info').innerText = "Távolság: " + Math.round(summary.totalDistance / 1000) + " km";
+                    document.getElementById('btn-google-maps').style.display = "block";
                 }).addTo(map);
+                
                 updateDB();
             });
+        }
+    }
+
+    function openExternalMaps() {
+        if (targetCoords) {
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lon}&travelmode=driving`;
+            window.open(url, '_blank');
         }
     }
 
@@ -203,6 +223,8 @@
         navigator.geolocation.clearWatch(watchId);
         document.getElementById('active-shift-menu').classList.add('hidden');
         document.getElementById('btn-shift-start').classList.remove('hidden');
+        document.getElementById('distance-info').innerText = "";
+        document.getElementById('btn-google-maps').style.display = "none";
         if (routingControl) map.removeControl(routingControl);
         supabaseClient.from('carriers').update({ is_online: false }).eq('full_name', currentUser.user_metadata.company || currentUser.email);
     }
